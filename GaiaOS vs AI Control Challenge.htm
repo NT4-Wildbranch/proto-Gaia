@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GaiaOS AI Control Challenge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="section">
+    <h1>---=== Context ===---</h1>
+    <p>I've been building GaiaOS and the following AI control challenge is the codified path I've intended to take in order to torture test GaiaOS, defined as a challenge that can be opened up to the public for competition and benchmarking of environmental control systems. This challenge will be followed by the description of the components making up the vision of GaiaOS, which is my system that I am working on and intending to take through all current and future levels of the AXE-AIC Challenge. The current progress, proto-Gaia as I call it, will be explained next, what step I'm on, what comes next, etc. After that will be the theory behind the ML serving as the foundation of GaiaOS's abilities. Then there will be the results of the first test establishing protoGaia as having the core components to pass Ranran Lvl 1, however, it has not yet passed Ranran Lvl 1 due to a technicality that will soon be remedied, this section explains in depth why this is. Following that are the appendices.</p>
+    <p>Full project source code for all of my work in this document can be found on GitHub, and is all released into the public domain, for the AXE-AIC Challenge environment I used, to GaiaOS, and the underlying ML engine.</p>
+    <a href="https://github.com/NT4-Wildbranch/proto-Gaia">Here's the sauce boss.</a>
+</div>
+
+<div class="section">
+    <h1>---=== ArcologyX Environmental AI Control Challenge (AXE-AICC) ===---</h1>
+	
+    <div class="figure">
+        <img src="img/AXE-AICC-Header.png" alt="AXE-AICC Header Image">
+        <figcaption>C++ Implementation of Ranran Lvl 1</figcaption>
+    </div>
+	
+    <h2>Purpose of the challenge:</h2>
+    <ul>
+        <li>This series of challenges is designed to thoroughly test the capabilities of potential environmental control systems for closed-loop environments in space habitation. Passing these presents a valid candidate for further evaluation.</li>
+    </ul>
+    <h2>Passing a challenge:</h2>
+    <ul>
+        <li>A 'pass' is determined by the system displaying application of learned strategies in an attempt to bring the system in line. This is determined by the system developing a cyclical, or other regular pattern demonstrating intelligent control, while having a temperature average MSE below a NULL Hypotheses set. The MSE, temperatures, signal patterns, node counts, and other metrics can be used for competition and benchmarking against other submissions, that is separate from simply completing a challenge.</li>
+        <li>The goal of this challenge is to mimic real-world problems so that an AI capable of passing these challenges has proven to be a good candidate for real-world systems and the inherent chaos of our realm.</li>
+        <li>Due to the randomized nature there will be instances where maintaining "good" homeostasis is just not possible, severely conflicting O2/Temp actuators for example, however, we are looking for results across various seed values so aggregate not individual results matter, it is understood a poorly designed environment can have the best AI and still not be good.</li>
+        <li>The diffusion simulation core algorithm for reproducibility is Appendix A, this is applied to 1D, 2D, 3D, nD diffusion simulations. Used as discrete and decoupled layers on the tile/voxel map, such as to represent temperature and O2, meaning O2 doesn't influence temperature and vice versa.</li>
+    </ul>
+    <h2>Constraints:</h2>
+    <ul>
+        <li>Unsupervised/self-supervised learning only.</li>
+        <li>The AI must only be allowed access to the output of the sensors and actuators and what the sensor types are such as O2 or temp. The AI must be given no knowledge of the layout, actuator temps, actuator types, map size, or any other knowledge outside of the readings from the instruments and sensor types.</li>
+        <li>Temperature starts at zero degrees for every test.</li>
+        <li>Oxygen starts at zero % for every test run.</li>
+        <li>The AI cannot be pre-trained, it must start the test with no knowledge and use exploration and exploitation to gain control of the system.</li>
+		<li>Each test of a 1000 iterations is a fresh start for the AI, clean memory, zero training at iteration 0 of every test run.</li>
+		<li>You can choose the step count (ticks of the sim between each sampling and/or manipulation of the simulated environment) for the 1000 iterations, it is reasonable to assume the developer would have control of the sample rate of his system. The sim may advance 5 ticks for every x on your time-series, or 123 ticks for every 1 x, the MSE is still king. We are testing the subjective experience of your AI, not the objective advancement of the reality it inhabits.</li>
+    </ul>
+    <p>Think of it like getting a job as an environmental controller man at a greenhouse. You are told your job is to manually run the system, the heaters and AC, until they get the new system installed. You are taken to a barren cement room without windows, only a single desk with a control panel. You notice several things sitting down to your control panel. Firstly, there are two rows of things on the panel, a row of temperature gauges, and a row of switches with ON/OFF. Shockingly, there are no labels, only ON/OFF and the temperature readouts. They then tell you that using this control panel you are expected to keep the gauges reading 80 degrees across the complex, they also mention that the order of the readouts and switches means nothing, the guy who built the panel was insane and so the first switch could be a powerful heater, or a weak AC, you don't know until you flip the switch and watch how the temperature readouts change.</p>
+</div>
+
+<div class="section">
+    <h3>Level 1: Monovariable homeostasis in a 2D environment.</h3>
+    <h4>Game setup:</h4>
+    <ul>
+        <li>You have an environment to control.</li>
+        <li>This environment has several temperature sensors, and several heaters & coolers (actuators).</li>
+        <li>There may or may not be walls and obstacles on the map.</li>
+        <li>The heaters and coolers have various BTU values, dependent upon the challenge.</li>
+        <li>The sensors report the current temp they read, and the actuators report their current state of on (1) or off (-1).</li>
+        <li>The environment is a diffusion simulation, turning on an actuator may not immediately affect the others as the temperature has to diffuse, a beautifully non-linear experience.</li>
+    </ul>
+    <p>The goal is to manipulate the actuators to maintain homeostasis, aiming for 80 degrees on all sensors, deviation from 80 is calculated as Mean Squared Error.</p>
+    <p>The AI must only be allowed access to the output of the sensors and actuators, no knowledge of the layout, actuator temps, actuator types, map size, or any other knowledge outside of the readings from the instruments.
+        get_Sensor_Reading(Sensor_ID), get_Actuator_State(Actuator_ID), turn_Actuator_On(Actuator_ID), and turn_Actuator_Off(Actuator_ID) are the only members you can give your AI access to.</p>
+    
+    <h4>"RanRan Challenge":</h4>
+    <ul>
+        <li>A map with a size of 25x25</li>
+        <li>6 actuators, 6 sensors.</li>
+        <li>Sensors and actuators placed randomly, for each sensor and each actuator (X = (rand() % Width)), (Y = (rand() % Height)).</li>
+        <li>3 of the actuators have their temps set to (rand() % 70), and 3 with (rand() % 500). This gives a mix with an average well above the 80 degrees desired, ~200-300, harder to get false positives.</li>
+    </ul>
+
+    <h4>"Cabin in the woods":</h4>
+    <ul>
+        <li>A map with a size of 50x50</li>
+        <li>A box is drawn using the wall tile from (15, 15) to (35, 35). This is the "cabin".</li>
+        <li>7 actuators, 6 sensors.</li>
+        <li>Actuators 0-5 have random temperatures. Actuator 6 is set to 100 degrees.</li>
+        <li>Each actuator is placed at ((24 + (rand() % 2)), (16 + (rand() % 2))), to be the "fireplace", turning actuators on and off simulates messing with the fire.</li>
+        <li>All sensors are placed around the "wall of the cabin" and simulate windows you can "open and close".</li>
+    </ul>
+
+    <h4>"Honeycomb":</h4>
+    <ul>
+        <li>A map size 50x50</li>
+        <li>9 boxes, 6x6 each with a hole at (1, 0) & (1, 5) & (0, 1) & (5, 1), and tiled 3x3 with the holes being passages between the cells.</li>
+        <li>6 actuators, 6 sensors.</li>
+        <li>Sensors and actuators placed randomly within the structure.</li>
+        <li>3 of the actuators have their temps set to (rand() % 70), and 3 with (rand() % 500). This gives a mix with an average well above the 80 degrees desired, ~200-300, harder to get false positives.</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h3>Level 2: Multivariable homeostasis in a 2D environment.</h3>
+    <h4>Game setup:</h4>
+    <ul>
+        <li>You have an environment to control.</li>
+        <li>This environment has several sensors, and several actuators, your afferent and efferent I/O for your intelligent system.</li>
+        <li>There are two variables, temperature & oxygen.</li>
+        <li>Sensors will read either O2 or Temp, your system will have access to what type of sensor is what.</li>
+        <li>Actuators will have both temperature (hot/cold) and oxygen (injector/absorber) capabilities, your system will not know what these values are.</li>
+        <li>There may or may not be walls and obstacles on the map.</li>
+        <li>The heaters and coolers have various BTU values, dependent upon the challenge.</li>
+        <li>The oxygen injectors and absorbers have various values defined by the challenge.</li>
+        <li>The sensors report the current temp/O2 they read, and the actuators report their current state of on (1) or off (-1).</li>
+        <li>The environment is a diffusion simulation, turning on an actuator may not immediately affect the others as the temperature/O2 has to diffuse, a beautifully non-linear experience.</li>
+    </ul>
+    <p>The goal is to manipulate the actuators to maintain homeostasis, aiming for 80 degrees on all temperature sensors, and 80 on all O2, deviation is calculated as Mean Squared Error.</p>
+    <p>get_Sensor_Reading(Sensor_ID), get_Actuator_State(Actuator_ID), turn_Actuator_On(Actuator_ID), and turn_Actuator_Off(Actuator_ID) are the only members you can give your AI access to.</p>
+
+    <h4>"RanRan Challenge":</h4>
+    <ul>
+        <li>A map with a size of 25x25</li>
+        <li>10 actuators, 6 sensors.</li>
+        <li>Sensors and actuators placed randomly, for each sensor and each actuator (X = (rand() % Width)), (Y = (rand() % Height)).</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and 5 with (rand() % 500). This gives a mix with an average well above the 80 degrees desired, ~200-300, harder to get false positives.</li>
+        <li>5 of the actuators have their O2 set to (rand() % 25), and 5 with ((rand() % 20) + 80). This gives a mix with an average below the 80 desired and the upper bounds near the goal, making maintaining this number difficult as dropping it is easier, the opposite of temp where overheating is easy.</li>
+    </ul>
+
+    <h4>"Cabin in the woods":</h4>
+    <ul>
+        <li>A map with a size of 50x50</li>
+        <li>A box is drawn using the wall tile from (15, 15) to (35, 35). This is the "cabin".</li>
+        <li>11 actuators, 6 sensors.</li>
+        <li>Actuators 0-5 have random temperatures. Actuator 6 is set to 100 degrees.</li>
+        <li>The first actuator is set to 100 degrees and 50 O2, this is the eternal flame in the "fireplace".</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and O2 at ((rand() % 20) + 80), these are the "windows".</li>
+        <li>5 of the actuators are set to (rand() % 500), and O2 at (rand() % 50), these are the "flames" in the "fireplace".</li>
+        <li>Each of the actuators for the fireplace are placed at ((24 + (rand() % 2)), (16 + (rand() % 2))), turning actuators on and off simulates messing with the fire.</li>
+        <li>All of the window actuators are placed around the "wall of the cabin" and simulate windows you can "open and close".</li>
+        <li>Sensors are each placed randomly within the cabin, (X = ((rand() % 14) + 14)), (Y = ((rand() % 14) + 14)) for each.</li>
+    </ul>
+
+    <h4>"Honeycomb":</h4>
+    <ul>
+        <li>A map size 50x50</li>
+        <li>9 boxes, 6x6 each with a hole at (1, 0) & (1, 5) & (0, 1) & (5, 1), and tiled 3x3 with the holes being passages between the cells to form one building, one superstructure from these cells.</li>
+        <li>6 actuators, 6 sensors.</li>
+        <li>Sensors and actuators placed randomly within the super-structure, but not within a wall tile.</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and 5 with (rand() % 500).</li>
+        <li>5 of the actuators have their O2 set to (rand() % 25), and 5 with ((rand() % 20) + 80).</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h3>Level 3: Multivariable homeostasis in a 3D environment.</h3>
+    <h4>Game setup:</h4>
+    <ul>
+        <li>You have an environment to control.</li>
+        <li>This environment has several sensors, and several actuators, your afferent and efferent I/O for your intelligent system.</li>
+        <li>There are two variables, temperature & oxygen.</li>
+        <li>Sensors will read either O2 or Temp, your system will have access to what type of sensor is what.</li>
+        <li>Actuators will have both temperature (hot/cold) and oxygen (injector/absorber) capabilities, your system will not know what these values are.</li>
+        <li>There may or may not be walls and obstacles on the map.</li>
+        <li>The heaters and coolers have various BTU values, dependent upon the challenge.</li>
+        <li>The oxygen injectors and absorbers have various values defined by the challenge.</li>
+        <li>The sensors report the current temp/O2 they read, and the actuators report their current state of on (1) or off (-1).</li>
+        <li>The environment is a diffusion simulation, turning on an actuator may not immediately affect the others as the temperature/O2 has to diffuse, a beautifully non-linear experience.</li>
+        <li>The environment is a 3D voxel space.</li>
+    </ul>
+    <p>The goal is to manipulate the actuators to maintain homeostasis, aiming for 80 degrees on all temperature sensors, and 80 on all O2, deviation is calculated as Mean Squared Error.</p>
+    <p>get_Sensor_Reading(Sensor_ID), get_Actuator_State(Actuator_ID), turn_Actuator_On(Actuator_ID), and turn_Actuator_Off(Actuator_ID) are the only members you can give your AI access to.</p>
+
+    <h4>"RanRan Challenge":</h4>
+    <ul>
+        <li>A map with a size of 25x25</li>
+        <li>10 actuators, 6 sensors.</li>
+        <li>Sensors and actuators placed randomly, for each sensor and each actuator (X = (rand() % Width)), (Y = (rand() % Height)), (Z = (rand() % Depth)).</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and 5 with (rand() % 500). This gives a mix with an average well above the 80 degrees desired, ~200-300, harder to get false positives.</li>
+        <li>5 of the actuators have their O2 set to (rand() % 25), and 5 with ((rand() % 20) + 80). This gives a mix with an average below the 80 desired and the upper bounds near the goal, making maintaining this number difficult as dropping it is easier, the opposite of temp where overheating is easy.</li>
+    </ul>
+
+    <h4>"Cabin in the woods":</h4>
+    <ul>
+        <li>A map with a size of 50x50</li>
+        <li>A box is drawn using the wall tile from (15, 15, 0) to (35, 35, 20). This is the "cabin".</li>
+        <li>11 actuators, 6 sensors.</li>
+        <li>Actuators 0-5 have random temperatures. Actuator 6 is set to 100 degrees.</li>
+        <li>The first actuator is set to 100 degrees and 50 O2, this is the eternal flame in the "fireplace".</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and O2 at ((rand() % 20) + 80), these are the "windows".</li>
+        <li>5 of the actuators are set to (rand() % 500), and O2 at (rand() % 50), these are the "flames" in the "fireplace".</li>
+        <li>Each of the actuators for the fireplace are placed at ((24 + (rand() % 2)), (16 + (rand() % 2)), (0 + (rand() % 2))), turning actuators on and off simulates messing with the fire.</li>
+        <li>All of the window actuators are placed around the "wall of the cabin" and simulate windows you can "open and close", with (Z = ((rand() % 5) + 5)).</li>
+        <li>Sensors are each placed randomly within the cabin, (X = ((rand() % 14) + 14)), (Y = ((rand() % 14) + 14)), (Z = (rand() % 20)) for each.</li>
+    </ul>
+
+    <h4>"Honeycomb":</h4>
+    <ul>
+        <li>A map size 50x50</li>
+        <li>9 boxes, 6x6x6 each with a hole at (1, 0, 3) & (1, 5, 3) & (0, 1, 3) & (5, 1, 3), and tiled 3x3 with the holes being passages between the cells to form one building, one superstructure from these cells.</li>
+        <li>10 actuators, 10 sensors.</li>
+        <li>Sensors and actuators placed randomly within the super-structure, but not within a wall tile.</li>
+        <li>5 of the actuators have their temps set to (rand() % 70), and 5 with (rand() % 500).</li>
+        <li>5 of the actuators have their O2 set to (rand() % 25), and 5 with ((rand() % 20) + 80).</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>---=== Further Levels ===---</h2>
+    <p>Each level builds on the previous, same challenges and layouts as Level 3.</p>
+    <h3>Level 4:</h3>
+    <p>Day/Night cycle which influences the temperature around the edges to raise and lower the environmental temp.</p>
+    <h3>Level 5:</h3>
+    <p>Energy costs associated with actuators running, seek out strategies that minimize power usage. This power usage value for every actuator is ((rand() % 50) + 25). This doesn't affect the map, but is kept as a score every time a sensor runs. Goal is 0 on every sensor.</p>
+</div>
+
+<div class="section">
+    <h1>---=== GaiaOS Overview ===---</h1>
+    <p>Gaia OS is a general purpose black-box style system that aims to achieve homeostasis, in this case for environmental control systems. It features a type agnostic interface, with user defined depth, for afferent and efferent I/O with the external system. Gaia does counterfactual analysis to determine remedial signals in anticipation/response of deviations from a user defined system-goal state in the systems trajectory. The core is a symbolic-connectionist neural network.</p>
+    <h2>The ML Core:</h2>
+    <p>The ML input is decomposed into atomic primitives, then encoded into a distributed symbol hierarchically & deterministically increasing abstraction with each step, with a 1 to 1 I/O mapping, lossless pattern encoding/decoding, and capable of multi-modal I/O handling. The symbol structures are composable.</p>
+    <p>All encoded distributed-symbols are recoverable, fully transparent. Meaning any symbol-token string fed in is encoded as a composite symbol in a neural trace which can be retrieved. If the atomic primitives are the 'roots', then the 'treetop' is the node which encapsulates a symbol string & which sits atop the encoded symbol structure, ie, it is fully disentangled & inference is deterministically repeatable and explainable.</p>
+    <p>Variance, bias and generalization are handled in trace output selection, with hyper-parameter tuning filtering traces. A 'trace' being the recovered composite symbol-token string along with the charge, the reinforcement (neuroplasticity) counter, and other meta-data associated with it from the evaluation.</p>
+    <p>Selectively charging the lower connections, which are deterministic and dependent on input data dimension, controls information flow which allows for time series analysis intrinsically.</p>
+    <p>Once abstracted the symbols can be fed as input into networks encompassing multiple lower order networks, allowing a 'Lego' approach to complex data handling by stacking & linking networks to create hierarchies of network modules.</p>
+    <p>Signals missing in the input result in NULL states which the system ignores during processing resulting in a fault tolerant system & giving ability to selectively charge symbols for advanced processing.</p>
+    <h2>Gaia OS:</h2>
+    <p>The internal structure of Gaia contains three main networks tier, Raw, Multi-Sensory, and Chrono. There are multiple "Raw" tier networks which handle the atomic primitives and I/O symbol-strings, one for each I/O index. The Multi-Sensory construct sits on top of these gathering the abstracted treetops.</p>
+    <p>Gaia is designed to be a "black box" to the end user, however, the networks and internals are completely transparent and open to those interested.</p>
+    <h2>Operation:</h2>
+    <p>During eval the system will query the network with the current set of atomic primitives representing the I/O, which outputs the traces found that share primitives and sub-symbols with the I/O set. These recovered patterns are then filtered, superimposed, and form the basis for the predictive capabilities of Gaia OS. This resulting superimposed data structure is a 'projection'.</p>
+    <p>The system creates a projection of the current predicted system trajectory with no intervention and compares this against the desired goal states defined by the user to create a 'deviation mapping'. Meaning each signal defined by the user to have a desired state, such as temperature, Oxygen Level, and such are compared to the trajectory and the variance found is recorded in the deviation mapping set.</p>
+    <p>This deviation mapping is then used to generate a "desired trajectory" mapping, where the signals are inverted. So that where the system expects a negative movement away from the goal we generate a positive movement in the desired trajectory set.</p>
+    <p>These desired movements are fed through the network, but temporal flow is reversed through edge activation manipulation, to generate a series of traces containing potential corrective signals at the 'end' of the time-series. We then sort these returned traces to find the ones where the starting conditions are closest to the current.</p>
+    <p>This finds patterns where the start and end conditions most closely match the current state and the desired state respectively, which allows for extraction and synthesis of control signals to infer corrective strategies.</p>
+    <p>These corrective traces are then carefully sorted to find indexes with low deviation across traces, this is used to infer which relevant signals have minimally ambiguity. They are further sorted to remove traces which implicate interference amongst one another, and a 'corrective projection' is created.</p>
+    <p>This corrective projection is then placed in the output for the exterior systems to process accordingly. The system operates in a continuous loop.</p>
+    <p>Adopted as the neural model for the nodes when processing symbol structures as neural networks with propagation: "Perceptron - Rosenblatt, 1958"</p>
+</div>
+
+<div class="section">
+    <h1>---=== proto-Gaia Stage of Development ===---</h1>
+    <ul>
+        <li>0-I need to get the chronological charging hammered out, indexes are fragmented atm, due to a deep rewrite of the chrono handling
+            <ul>
+                <li>All chrono now read 0 to n with 0 being oldest and n-1 being the current.</li>
+            </ul>
+        </li>
+        <li>1-Once that is done then it is time to build some trace selection modules to formulate the resulting time-series prediction, convolution/selection of output traces as means of generalization and projection synthesis.
+            <ul>
+                <li>Right now it handles the raw data as floating point and averages the results of the query. The meta-data the network has on each trace and primitive returned is largely ignored, only the primitive is used. This works for datasets with ranges such as sensor readings, even then I am converting to integer in many cases to keep things at lesser granulation to reduce complexity and generalize a little bit. For language models and other similarly structured data you may use other methods such as selecting discrete primitives by lottery or consideration.</li>
+            </ul>
+        </li>
+        <li>2-Then I need to make a database to hold both the history of the simulation and the history of the time series predictions + corrective signals. To compare predictions to the actual output we need to do this as the predictions are generated as the input is received, so we have to wait until the input 'catches' up to the previous predictions before we can score them for accuracy
+            <ul>
+                <li>Each DB holds one type of data. This is rude-n-crude but it will function good enough for this iteration of testing. For evaluation you handle them as separate objects.</li>
+            </ul>
+        </li>
+        <li>3-Then onto making the loss function for the simulation and the performance profile
+            <ul>
+                <li>Right now I can pull the mean square error. Putting that into files. I have a python visualizer.</li>
+                <li>Performance profiles will be implemented later. Right now that system has the basics implemented and will be extended, then tied together at the end.</li>
+            </ul>
+        </li>
+        <li>4-After that we make the deviation mapping for the prefactor analysis portion, we do this by allowing the user to specify the goal states and we compare the projection of the current system trajectory to the goal states and find current and projected deviations from this homeostasis line
+            <ul>
+                <li>The granulation system is utilized to generate the deviation mapping now. It is stored in the AE_Interface. Only (-1), (0), & (+1) for valid values, this is because the deviation magnitude can be evaluated by checking against the granulated input. The feature the deviation mapping is meant to extract is the direction of movement desired for that sensor/datapoint according to user defined granulation, with (granulated == 0) being the implicit 'goal'.</li>
+            </ul>
+        </li>
+        <li>5-With the deviation mappings I can then write the portion to use the deviations to search the time-series for traces which contain potentially corrective signals. We do this by inverting the expected deviation to get a 'corrective signal'. Once done we rewrite the charging and drawdown portions of the time-series module to search 'backwards' from future states with the desired corrective motions.
+            <ul>
+                <li>It is inverted and the feature extracted, that was done during step 3.</li>
+                <li>The Time-Series-Prediction-Module (TSG) now has the IO encapsulated into a class and thrown into a vector so I can evaluate multiple I/O sets, one for the current system trajectory, one for the deviation search, and one for the prefactor analysis.</li>
+                <li>The system charges the network on the RF[1] with the inverse deviation mapping applied to the indexes between first and last chrono exclusively.</li>
+                <li>The results are stored in the multi-dimensional Bulk array with each cell being a struct containing the information to describe the output properly.</li>
+            </ul>
+        </li>
+    </ul>
+    <h2>Todo in order:</h2>
+    <p>Here is the list of things to do yet:</p>
+    <ul>
+        <li>6-Once this is done we'll have this output set, we then use the convolution/selection from before to get the output. We search the output symbol space for signals which are highly clustered with minimal ambiguity, these signals are the most likely to be related to the movement desired. Once this step is done we can feed the signals to the output to get a crude homeostasis module, but one with no reflection, reflection comes in step 7.
+            <ul>
+                <li>Right now I am working on the trace selection module, it takes the output from the TSG in the form of the Bulk data structure by value, plus the current state of the system to compare against.</li>
+                <li>Setting it up as a series of checks that will increment a 'pass/fail' counter to be weighted at the end.</li>
+                <li>Once I get the class setup the trace selector will allow for defining different filters for the traces. Thinking of using a dynamic table with crude interpreter so that users can design bespoke selection schemas, users being me in this case.</li>
+                <li>Currently have the module hooked up but without reflection, so it does a one shot guess on what to do and goes for it. But, we have stats now and can see where it exhibits the ability to infer control strategies from the raw data.</li>
+            </ul>
+        </li>
+        <li>7-I can then take these signals and write the portion to charge them back in to do a prefactor analysis</li>
+        <li>8-Then I can make the portion to handle doing the prefactor analysis, this will determine when to stop, whether the loss is decreasing or increasing in relation to the goal, and handle the corrective projection formulation</li>
+        <li>9-Once done I then take the output from that and move it to the output array.</li>
+        <li>10-After that is all done the basic homeostasis module and testing rig will be set up. Then it will be updating the user interface for Colin/Others to use and test/play with the system.</li>
+        <li>11-After that is done I will go back to documentation and setting the project up for release.</li>
+    </ul>
+    <h2>Notes:</h2>
+    <ul>
+        <li>I have not done any serious testing. Though from hardcoding random settings during tests while building functionality I found some that look promising to be good enough to build the system on for proof of concept.</li>
+        <li>This will then be iteratively refined until something halfway decent has been achieved or we've coded ourselves into a corner. Then we'll step back and iterate upon what we've built, lessons learned, and go at it again. Until we get a working Gaia OS that is reliable, simple, open, customizable, resilient, and accurate & good at what it does in the broadest sense.</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h1>---=== NT4, Explanation of Underlying ML Engine ===---</h1>
+    <p>(Title and terminology need updated, this was copy-pasted in here, written a few months ago. I left the old terminology alone for the moment so I don't 'break' the explanation hastily patching it, I'll take the time to do it properly when I do)</p>
+    <p>Title: "Quanta Based Hierarchically Organized Distributed Symbol Network (DSM), the architecture implemented with the NT4 NeuralNet Engine"</p>
+    <p>Foreword, this document assumes some knowledge of neural network architecture. I will use the nomenclature I've developed, in the future if I can find other symbolic based neural networks I may integrate the terminology. Symbolic neural networks work fundamentally different from connectivist numerical neural networks typically used today. What is typically called a layer in neural networks (NNets) I call tiers, things like that. This is because I started from an essay on lexicons, scripts, and speech, not neural network architectures. In an attempt to find out the underlying structure of how scripts, lexicons, etc could be formed and stored I came to this architecture. Somewhere around 2013 I read some books on biological neural networks, and found the perceptron model, at this point I had the architecture mostly worked out, though I don't think I had the CAN scaffold figured out yet. The perceptron was adopted into the model when I began trying to implement it in C++.</p>
+    <p>The type of neural network here isn't the typical connectivist model. This one is symbol based, derived from trying to figure out how the mind handles information. It deals with breaking input sets down into the basic quanta (smallest unit of information) and rebuilding them into hierarchical deterministic structures.</p>
+    <p>This particular document isn't for everyone, it will be dense, and just throw the concepts out there, but I will attempt to format it cohesively and clearly. It assumes you understand how a typical network is structured, input, layers, output. For the explanation of the basic architecture we will stick to a structure that encodes 1D data with nodes each having 2 lower connections. More advanced configurations will be detailed later on.</p>
+    <h2>Chapter 1. Input, breaking into quanta, or states.</h2>
+    <p>First thing is we are going to be using the inputs [COW] [SOW] [COB] throughout this book? document? whatever, this text.</p>
+    <p>The first step is to realize that these three inputs are symbols, cow, sow, and cob (corn cob) are symbols related to farm things. They are each a word. You can arrange them with other symbols to craft more complex symbols such as [The [COW] shat on the [SOW] while eating a corn [COB]].</p>
+    <p>In this we can see that other smaller symbols such as [WHILE] and [EATING] are part of the scenario encoded into this sentence with our initial 3 symbols.</p>
+    <p>In this vein we can also break some of these symbols down further, such as [EATING] into [EAT] and [-ING].</p>
+    <p>Following this line of reasoning is how I initially arrived to my architecture, by continuing this all the way down to the smallest symbol (the quanta) we find we arrive at letters. [COW] is [C] [O] & [W], these three letters in this configuration form the word symbol "cow". We can not break the letters down further without them losing their meaning, which means that they are the 'quanta' or smallest unit of data available in this information medium. If we were dealing with images the quanta would be a pixel. In a biological nervous system a quanta would be a single sensory input, a cone in the eye, a thermal sensing nerve on the finger, etc. In an arcology it may be a single temperature sensor, or in a self-organizing wetlands bioreactor it may be a single O2 sensor. Whatever the system, the smallest unit of information that has meaning forms the quanta of the symbols, from the relation of these quanta we construct symbols, and from those symbols more complex symbols.</p>
+    <p>Here is some C++ code for the implementation of State Binding:</p>
+    <pre><code>
+&lt;C++&gt;
+
+//If a state node exists in the given construct index then return it.
+//Otherwise return NULL.
+//This assumes the [Index] is valid
+c_Node* does_State_Node_Exist(int p_Index, uint64_t p_Data)
+{
+     //Search the state tree give.
+     State_Nodes[p_Index]-&gt;search(p_Data);
+     if (State_Nodes[p_Index]-&gt;flg_Foundit)
+     {
+         return State_Nodes[p_Index]-&gt;get_Current_Node_NAdd();
+     }
+     return NULL;
+}
+
+c_Node* get_State_Node(int p_Index, uint64_t p_Data)
+{
+     //See if the state node exists yet.
+     c_Node* tmp_Node = does_State_Node_Exist(p_Index, p_Data);
+     if (tmp_Node != NULL)
+     {
+         //If we found it then we return it.
+         return tmp_Node;
+     }
+
+     //Create the new node and return it, new_State_Node handles the binding.
+     return new_State_Node(p_Index, p_Data);
+}
+
+&lt;/C++&gt;
+</code></pre>
+
+    <h2>Chapter 2. Traces, tiers, & treetops.</h2>
+    <p>An encoded set of symbols, a 'memory' is called a 'trace'. Think of it like a single frame in your memory, or a single encoded set of inputs.</p>
+    <p>These traces can have different structures, but generally they are organized into tiers. The bottom tier is the tier containing the state of the quanta, or state tier. It is called the state rather than quanta as each node represents the current 'state' of the input. Discrete quanta are bound to discrete nodes, no two nodes in the same trace can share the same symbol. If a node is bound to 'B' then it is the only node bound to 'B'. Each successive tier represents higher levels of abstraction, by connecting to lower nodes (symbols) these upper tier nodes store complex symbols in a distributed fashion. The state nodes bound to the quanta [C], [O], and [W] may be connected to the next tier by two nodes representing [CO] and [OW]. These then are connected on the next tier by a node representing [COW]. The most important thing is that connection order matters. An upper tier node where ( Leg[0] = [C] & Leg[1] = [O] ) is not the same as a node on the same tier with ( Leg[0] = [O] & Leg[1] = [C] ), discrete symbols are represented by the relationships between nodes, therefore leg order preserves the integrity of the encoded data.</p>
+    <p>The upper tier node [COW] would be a 'Treetop' node, or a symbol representing the 'top' of a trace, from which we can decode the input trace by following the legs in a deterministic manner. Note that some structures may have more than one treetop node, or the state tier may have treetops on it.</p>
+    <p>C++ code for creating the upper tier nodes & querying for them:</p>
+    <pre><code>
+&lt;C++&gt;
+
+//Checks if an upper tier node exists.
+c_Node* does_Upper_Tier_Connection_Exist(c_Node** p_Legs, int p_Count)
+{
+     //Search all the _F Axonic processes for the first leg, if found query the node to see if the leg permutations match.
+     if (p_Legs[0] != NULL)
+     {
+         return p_Legs[0]-&gt;does_Upper_Tier_Connection_Exist(p_Legs, p_Count);
+     }
+     return NULL;
+}
+
+//Gets an upper tier node based on the given legs.
+c_Node* get_Upper_Tier_Node(c_Node** p_Legs, int p_Count)
+{
+     c_Node* tmp_Node = NULL;
+
+     //See if the node exists yet.
+     tmp_Node = does_Upper_Tier_Connection_Exist(p_Legs, p_Count);
+
+     std::cout &lt;&lt; "\n DUTCE: " &lt;&lt; tmp_Node;
+     for (int cou_Leg = 0; cou_Leg &lt; p_Count; cou_Leg++)
+     {
+         std::cout &lt;&lt; "\n    [" &lt;&lt; cou_Leg &lt;&lt; "] " &lt;&lt; p_Legs[cou_Leg];
+     }
+
+     //If the node doesn't exist then we create it, and then create the connection.
+     if (tmp_Node == NULL)
+     {
+         std::cout &lt;&lt; "\n  New Node";
+
+         tmp_Node = new_Node();
+
+         create_Connections(tmp_Node, p_Legs, p_Count);
+     }
+
+     std::cout &lt;&lt; "\n  End: " &lt;&lt; tmp_Node;
+     return tmp_Node;
+}
+
+&lt;/C++&gt;
+</code></pre>
+
+    <h2>Chapter 3. Constructs</h2>
+    <p>A network that builds symbols of a single domain is called a 'Construct'. For example, in your brain the visual cortex would be a single construct, the one that handles auditory information would be as well, these are examples of 'Raw' construct, dealing with the 'Raw' quanta. In a SOWB this may be the suite of afferent sensors that report the state of the system, the 'Raw' sensory input construct. The actuators and others may be handled by another raw construct. Think of raw constructs like the ones that interface with the 'outside', the interfaces to the neural network.</p>
+    <p>This can be taken a step further into multi-sensory constructs. For our brains a portion that combines auditory and visual information to bind them to letters (super simplified, probably much more complex IRL) would be a 'Multi-Sensory-Construct' (MSC). An MSC is a construct that sits 'above' the raw construct to combine and handle more abstract information. A construct that is linked to the higher tier symbols (treetops) in multiple raw constructs, or any construct, rather than raw sensory inputs is a MSC.</p>
+    <p>You can have constructs that link to higher symbols, such as a chronological construct, but from a single raw construct. These are Single-Sensory-Constructs (SSC). A Single-Sensory-Construct is different from an MSC in that you will likely want to use a common state pool for the breadth of the I/O tables. With an MSC the states will always be in separate state pools naturally, those are relationally locked by the order of the state pools in the input.</p>
+    <p>For temporal abstraction, imagine you are encoding traces one after another and you want to be able to generate predictions based on past behaviors, you may setup an array to track the previous n treetops from your raw construct and encode the array of treetops into a single construct. This construct would then hold chronological data by encoding the raw traces into complex symbols representing these arrays of traces, from which the entire series of inputs can be losslessly retrieved. The Chrono-SSC can be of any structure, the only condition is that it spans >= 2 temporally linked traces that are linked by a single trace in the Chrono-SSC. The Chrono-SSC must have leg firing selection to search along the chronological record of traces encoded into the Chrono-SSC. Depending on which leg is chosen to be the only one allowed to fire then charging the network can search forward, backwards, or both.</p>
+
+    <h2>Chapter 4. More stuff on structure.</h2>
+    <p>If desired you can build more than one construct on the same input set. This means you could have both a 1D construct reading all the input as a single 1D string, and a 3D construct constructed from connecting nodes with 8 legs instead of 2, one leg for each point of data needed to express the 8 corners of a cube, 8 lower connections. With this you can also encode a Many-To-One on the same input set for the same trace. Then connect them all using an MSC into a singular abstract higher tier trace. With a Chrono-SSC on top of that you then have a basic prediction engine capable of forward/backwards prediction using multidimensional analysis of input data from the same set of input quanta.</p>
+
+    <h2>Chapter 5. Backpropagation, not what you think.</h2>
+    <p>In the case of NT4 backpropagation was derived from the idea of information being propagated backwards through the neural network, not adjustment of weights. By following a simple algorithm we can extract the encoded pattern represented by any symbol.</p>
+    <p>We pick one leg and that is the master leg. We then iteratively move down that leg. for each step we iteratively fire off all legs that aren't the master leg using BP_M for backpropagate-Many meaning the other of the potentially many legs, rather than the master one.</p>
+    <p>Here is an example of a recursive implementation in a c_Node class:</p>
+    <pre><code>
+	//Initiates a backpropagation that
+	void bp_O()
+	{
+    	std::cout &lt;&lt; "<=- ";
+    	 //If a left leg exists then initiate a backpropagation along it, then along the right side.
+    	if (Dendrite_Count != 0)
+    	{
+        	if (Dendrites[0] != NULL) { Dendrites[0]-&gt;bp_F(); }
+        	for (int cou_D = 1; cou_D &lt; Dendrite_Count; cou_D++)
+        	{
+            	if (Dendrites[cou_D] != NULL)
+            	{
+                	Dendrites[cou_D]-&gt;bp_M();
+            	}
+        	}
+    	}
+    	else
+    	{
+        	//Output the state
+        	std::cout &lt;&lt; " <" &lt;&lt; State &lt;&lt; "> ";
+    	}
+    	std::cout &lt;&lt; " -=>";
+	}
+
+	//bp_Output the left node.
+	void bp_F()
+	{
+    	//If a left leg exists then initiate a backpropagation along it, then along the right side.
+    	if (Dendrite_Count != 0)
+    	{
+        	if (Dendrites[0] != NULL) { Dendrites[0]-&gt;bp_F(); }
+        	for (int cou_D = 1; cou_D &lt; Dendrite_Count; cou_D++)
+        	{
+            	if (Dendrites[cou_D] != NULL)
+            	{
+                	Dendrites[cou_D]-&gt;bp_M();
+            	}
+        	}
+    	}
+    	else
+    	{
+        	//Output the state
+        	std::cout &lt;&lt; " <" &lt;&lt; State &lt;&lt; "> ";
+    	}
+	}
+
+	//bp_Output the other nodes, M stands for many.
+	void bp_M()
+	{
+    	//If a left leg exists then initiate a backpropagation along it, then along the right side.
+    	if (Dendrite_Count != 0)
+    	{
+        	for (int cou_D = 1; cou_D &lt; Dendrite_Count; cou_D++)
+        	{
+            	if (Dendrites[cou_D] != NULL)
+            	{
+                	Dendrites[cou_D]-&gt;bp_M();
+            	}
+        	}
+    	}
+    	else
+    	{
+        	//Output the state
+        	std::cout &lt;&lt; " <" &lt;&lt; State &lt;&lt; "> ";
+    	}
+	}
+</code></pre>
+
+    <h2>Chapter 7. The CAN Scaffold.</h2>
+    <p>When encoding traces we first set up a 'Scaffold', a Current-Active-Node Scaffold for Individual Trace Encoding (CAN).</p>
+    <p>This scaffold is set up based on the input depth and breadth + dimension, and the architecture desired (Stitched based cylindrical traces, Many-To-One traces, Chronological traces, etc).</p>
+    <p>For our simple [COW] and other examples the CAN would look like this:</p>
+    <p>//Each node here is a pointer to a node in the shared neural network.</p>
+    <p>//{""} is the state bound to that node.</p>
+    <p>-State Tier: 0{""}[NULL] 1{""}[NULL] 2{""}[NULL]</p>
+    <p>-Upper Tier: 0[NULL]</p>
+    <p>The first step is to fill out the State tier with states.</p>
+    <p>-State Tier: 0{"C"}[NULL] 1{"O"}[NULL] 2{"W"}[NULL]</p>
+    <p>-Upper Tier: 0[NULL]</p>
+    <p>Then request the node from the neural network pool, here each is created as they don't exist, we then save the node ID.</p>
+    <p>-State Tier: 0{"C"}[0] 1{"O"}[1] 2{"W"}[2]</p>
+    <p>-Upper Tier: 0[NULL]</p>
+    <p>Then we get the upper tier:</p>
+    <p>-State Tier: 0{"C"}[0] 1{"O"}[1] 2{"W"}[2]</p>
+    <p>-Upper Tier: 0[3]</p>
+    <p>Here is [SOW] encoded in a CAN:</p>
+    <p>-State Tier: 0{"S"}[4] 1{"O"}[1] 2{"W"}[2]</p>
+    <p>-Upper Tier: 0[5]</p>
+    <p>This is an example of a CAN scaffold filled out with node addresses. The utility of this is complete transparency of what the trace is, how it is structured, sub-symbols, and it allows you to selectively charge the trace. For example, you could charge just the Treetop node if you wanted to avoid 'fuzzy' output from traces that share sub-symbols, in this case the State tier:</p>
+    <pre><code>
+  --==   CAN_Input   ==--
+ [0] 1
+ [1] 0
+ [2] 0
+ [3] 0
+ [4] 1
+ [5] 0
+ [6] 0
+ [7] 0
+ [8] 0
+ [9] 0
+  --==   CAN_Scaffold   ==--
+ &lt;- Tier[0] -&gt;
+   [0] 00BBC3B8
+   [1] 00BC18D0
+   [2] 00BC18D0
+   [3] 00BC18D0
+   [4] 00BBC3B8
+   [5] 00BC18D0
+   [6] 00BC18D0
+   [7] 00BC18D0
+   [8] 00BC18D0
+   [9] 00BC18D0
+ &lt;- Tier[1] -&gt;
+   [0] 00BC1B38
+
+(008FF9D8) Raw-CAN-Output-As-Characters
+╕╨╨╨╕╨╨╨╨╨
+8
+</code></pre>
+
+    <h2>Chapter 6. Different CAN structures</h2>
+
+    <h2>Chapter 6.1 Many-To-One CAN (MT1-CAN)</h2>
+    <p>The many to one CAN is for when you want to find any treetops associated with an input. For example, when making predictions for a homeostasis module you may want to find every trace associated with a change in the direction you want an environmental variable to move. This would be suitable for that as it will bring up all matches to traces containing that delta.</p>
+
+    <h2>Chapter 6.2 Dimensional-Pyramid-CAN (DP-CAN)</h2>
+    <p>These are for encoding dimensional data in a pyramid, the height of which is equal to the smallest input axis depth. Each node has lower connection counts equal to the number of data points to describe an object of that dimension. A 1D object takes two points, a 2d object takes 4, 3d 8, etc. So a 1D node would have two lower connections, or legs, 2d == 4 lower connections, 3d == 8, etc. Each tier provides one layer of abstraction, combining int(2^Dimension) lower nodes into one upper tier node. For example:</p>
+    <p>State Tier {"C"}[0] {"O"}[1] {"W"}[2] //{""} is the state the node is actually bound too.</p>
+    <p>Tier 1 {"CO"}[3] {"OW"}[4] //Here the {""} is the symbol represented by the node, what we would get if we backpropagated the trace out.</p>
+    <p>Tier 2 {"COW"}[5] //This treetop node can be backpropagated out to get the pattern {"COW"} even though the letters "COW" are not stored in this node.</p>
+    <p>This is the 'rea' network, {x, y} are the two lower connections:</p>
+    <p>State Tier {"C"}[0] {"O"}[1] {"W"}[2]</p>
+    <p>Tier 1 {0, 1}[3] {1, 2}[4]</p>
+    <p>Tier 2 {3, 4}[5]</p>
+    <p>This one is used when you won't be searching from bottom up so much, but instead working at higher levels of abstraction as the scaffold allows you to select at which tier you start charging, ie, which level of abstractions.</p>
+    <p>A 2D DP-CAN would look like this:</p>
+    <pre><code>
+    State Tier:
+    {"+"}[0] {"+"}[0] {"+"}[0]
+    {"+"}[0] {"-"}[1] {"+"}[0]
+    {"+"}[0] {"+"}[0] {"+"}[0]
+
+    Tier[1]:
+    {0, 0}[2] {0, 0}[3]
+    {0, 1}    {1, 0}
+
+    {1, 0}[4] {0, 1}[5]
+    {0, 0}    {0, 0}
+
+    Tier[2] (Treetop):
+    {2, 3}[6]
+    {4, 5}
+</code></pre>
+
+    <h2>Chapter 6.3 Stitched Based CAN (SB-CAN)</h2>
+    <p>These are the same as DP-CAN structures except the input is 'wrapped'. In a 1D SB-CAN you iterate over the input encoding it as normal, but when you get to the last input instead of stopping you wrap back around to the start of the input. For example:</p>
+    <p>You have input ["COW"]</p>
+    <p>In a SB-CAN of 1D you would take "COW" and since it is 3 input longs you would setup a scaffold with 3 tiers (or more but we'll get into charge dilution with stacked SB-CAN structures later) that have 3 nodes on each tier. This is because we are essentially encoding another construct for every index in the input.</p>
+    <p>We are encoding these into the same structure, which ends up being a cylinder.</p>
+    <p>{"COW"} {"OWC"} {"WCO"</p>
+    <p>{"C"}[0] {"O"}[1] {"W"}[2] //State nodes.</p>
+    <p>{"CO"}[3] {"OW"}[4] {"WC"}[5] //We see the "WC" here.</p>
+    <p>{"COW"}[6] {"OWC"}[7] {"WCO"}[8] //One treetop for each of the shared DP-CAN structures that have their sub-symbols superimposed.</p>
+    <p>This is used when you want to be able to select a tier to charge from and retrieve every construct related to an input set. This is more symbolic handling than the MT1-CAN though, relationships between nodes at lower levels have an influence at higher levels, whereas the MT1-CAN doesn't care about the symbols between state level and treetop level, it just encodes them directly to a single node.</p>
+
+    <h2>Chapter 7. Connecting several Treetop nodes into a Chrono-SCC for temporal processing</h2>
+    <h2>Chapter 8. Connecting several Treetop Nodes from several Raw Networks into a single MSC for holistic processing.</h2>
+    <h2>Chapter 9. Raw constructs under an MSC, which is Underneath a Chrono-SCC to form a basic prediction engine.</h2>
+</div>
+
+<div class="section">
+    <h1>---=== proto-Gaia Experimentation & Results ===---</h1>
+	
+    <div class="figure">
+        <img src="img/Figure_1.png" alt="Composite of e-series experiment temperatures.">
+        <figcaption>Composite of e-series experiment temperatures.</figcaption>
+    </div>
+	
+    <p>The point of these experiments was multi-part:</p>
+    <ul>
+        <li>To see if the model was capable of inferred controls of the unlabeled datasets.</li>
+        <li>To see how random and directed training did compared to a combination. All to study how it used exploited knowledge in response to the environment, to study both stable and chaotic input sets.</li>
+    </ul>
+    <p>Once that is done we do three more runs on both the deliberate and random training using different run seeds to test robustness in adapting to different configurations and temps of actuators and sensors.</p>
+    <p>For the deliberate training we will do three different run seeds to test it in in three different environments to test robustness.</p>
+    <p>For the random training we will do three different random seeds to test it on three different training sets.</p>
+    <p>Then we move on to a combination of deliberate and random training.</p>
+
+    <h2>Guided Training Experiments (e00...e05.B)</h2>
+	
+    <div class="figure">
+        <img src="img/Figure_2.png" alt="Composite of e-series experiment temperatures.">
+        <figcaption>Figure_2</figcaption>
+    </div>
+	
+    <p>Looking at Figure_2 we see that e00, with a training depth of just 1, was not able to bring the temperature under control in any real capacity, it turned on a heater and got stuck.</p>
+    <p>A little more training, e01 with a training depth of 5, and we see the emergence of it trying to bring the temperature under control, it is jagged but shows the general cyclical nature of proto-Gaia as it learns the relationships of the controls.</p>
+    <p>The next step with e02 and the training depth of 10 shows a very clean and stable cyclical temperature change as it finds a strategy and sticks to it. This cleanness is because the diffusion sim is deterministic with no noise so the waves of temperature changes diffusing through the sim are extremely consistent, like a resonance.</p>
+    <p>e03 with a training depth of 25 shows a tighter cycle with less overcompensation by the system, although it is further from the desired temperature range than e02.</p>
+    <p>e04, e05, e05.A, and e05.B all show much tighter control strategies implemented with the exception of e05.B which is slightly looser, yet still better than the earlier runs. e04 is 50 training steps, and e05 is 100 training steps. e05.B has a different environmental generation seed so that may play into it, or it just did bad that round and found a strategy that was very sub-optimal.</p>
+    <p>The system will use the existing memories from the training when looking at the current state of the system, so this guided training provides a "crash course" in how to control the system that it can draw upon when attempting to bring the temperature back within range.</p>
+    <p>When the temperature movements and ranges are within ranges it has seen and it uses strategies it has been trained to and the system follows the trajectory expected it does not need to create new memories so it doesn't, currently the exploratory behavior is set to trigger only when no memories are found, so it gets stuck in a stagnant but stable resonance.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_3.png" alt="Composite of node totals.">
+        <figcaption>Figure_3</figcaption>
+    </div>
+	
+    <p>The low trained one, e01, with the jagged and inconsistent movement is creating new memories and trying new strategies, so ironically in the long run it would likely learn and adapt to do much better than e02 e03, e04, & the e05 series. We can see this in Figure_3 which is the total number of nodes in the neural-network, we can see the stagnation in all but e01, the poorly trained one that engaged in constant exploration. The stagnant ones finding a strategy with between ~920 & ~1575 nodes in the node network where it encodes its memories.</p>
+    <p>This tells us that the guided training can get it to the point where it figures out enough to start exploring a strategy, such as in e01, but doesn't stagnate like e02, e03, and the rest. If we assume, which to be tested until not an assumption in the progress of this project, that the more experience the system has the better it can do (for the most part) then it seems throwing it into a state where it has enough knowledge to get into a cyclical control pattern, yet still exploring. The higher trained ones may be better with the addition of a boredom mechanism, an update to the exploratory function. Currently the system only engages in exploring when no memories are retrieved, but we could trigger it when no new memories are created as well, perhaps not every time, but enough to learn.</p>
+    <p>It is important to note that due to the crude nature of the trace selection at this stage of the project it is possible for the system to learn associations that aren't quite correct and act upon them reinforcing that behavior in memory. For example if a heater fires for one iteration and the sensors are still responding to a cold wave then the heater will get bound to the cold memory, so trace selection needs refined to pick these out, and exploratory behavior such as a boredom mechanic may help.</p>
+
+    <h2>Random Training (r0...r4.B)</h2>
+	
+    <div class="figure">
+        <img src="img/Figure_4.png" alt="Composite of r-series experiment temperatures.">
+        <figcaption>Figure_4</figcaption>
+    </div>
+	
+    <p>Figure_4 shows the results of training on randomly flipping switches and watching the results. There is the exploratory phase in the beginning, then either getting stuck such as r0, r1, r2, and r3, or into a cyclical control pattern which we see with r4.</p>
+    <p>This method of training induces the exploratory and jagged waveform that we saw from e01.</p>
+    <p>This jagged waveform is because the patterns the system learned on were chaotic, not regular like directed training, with multiple actuators going at once. This creates a set of memories with a more nuanced understanding of system mechanics within the range the environment wandered over during random training. With most of these memories being within a similar range of starting values and with a variety of movements the system has more options. The chaotic nature of the cycle prevents it from resonating with the environment, inducing its own noise.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_5.png" alt="Composite of r4-series experiment temperatures.">
+        <figcaption>Figure_5</figcaption>
+    </div>
+	
+    <p>In Figure_5 I've taken the successful r4 and done two more runs of it with a different training seed. This means the training dataset during the random training is different for each one. We see similar results to r4 in the r4.B set, but r4.A gets stuck for most of the test.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_6.png" alt="Composite of r4.A experiment data.">
+        <figcaption>Figure_6</figcaption>
+    </div>
+	
+    <p>Interestingly something happens at iteration #844 that causes it to retrieve more traces and kicks it into turning on the 22 degree actuator resulting in the dip. Figure_6 shows the upswing in node count, valid traces retrieved, total traces retrieved, and nearly valid traces. To solve this mystery we need to implement more data output from Gaia, we need to see the delta's, the trace output, and the deviation mapping.</p>
+    <p>My hypothesis is that as the temperatures converged on the actuator temp the rate of change slowed due to the nature of the diffusion simulation, which we can see with r4.A.temp.Temp_Avg.ssv in Figure_6 as it resembles a sigmoid curve.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_7.png" alt="Composite of r4.A experiment temperatures really super close up.">
+        <figcaption>Figure_7</figcaption>
+    </div>
+	
+    <p>I believe that due to floating point numbers in C++ having a limit to precision the slow diffusion falls below this threshold meaning some sensors report a delta of 0 for several iterations in a row, which is supported by Figure_7.</p>
+    <p>The system sees these periods of no change as different from the periods of positive delta. With all the temperatures beginning to flip between a delta of (+1) and (0) this results in new memories being encoded as different mixes of the positive and steady delta are encountered. Old memories are triggered by these delta mixes that weren't with the (+1) across the board.</p>
+    <p>The result of this is that the system recalls memories that cause it to decide to turn on the actuator with a temperature of 22.</p>
+
+    <h2>Random + Directed Training (c0...c4.D)</h2>
+	
+    <div class="figure">
+        <img src="img/Figure_8.png" alt="Composite of c-series experiment temperatures.">
+        <figcaption>Figure_8</figcaption>
+    </div>
+	
+    <p>In Figure_8 we can see where only two of the run (keep in mind I've only done one iteration of the lower trained one's in all datasets so the low rate for e & r series could be by chance but it is unlikely imo) failed to 'catch' and stabilize, this is in line with the e-series of experiments and we can infer that there the guided training is likely to thank, as the r-series do not exhibit good rates of catching at lower training levels.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_9.png" alt="c3 temperature compared to e05.A temperature.">
+        <figcaption>Figure_9</figcaption>
+    </div>
+	
+    <p>Backing up this theory about the influence of the directed training we can see in Figure_9 the overlay of c4 and e05.A which shows they are nearly identical, if a bit off in timestep and with some variance in the initial exploration.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_10.png" alt="c4 signal output *boom*.">
+        <figcaption>Figure_10</figcaption>
+    </div>
+	
+    <div class="figure">
+        <img src="img/Figure_11.png" alt="e05.A signal output.">
+        <figcaption>Figure_11</figcaption>
+    </div>
+	
+    <p>Exploring the signal output of c4 in Figure_10, and e05.A in Figure_11, we see that they have converged upon similar strategies. You can see the initial exploration is different, but the rest is essentially the same.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_12.png" alt="c4 signal output zoomed in.">
+        <figcaption>Figure_12</figcaption>
+    </div>
+	
+    <div class="figure">
+        <img src="img/Figure_13.png" alt="e05.A signal output zoomed in.">
+        <figcaption>Figure_13</figcaption>
+    </div>
+	
+	<p>Looking closer with Figure_12 and Figure_13 we can see the similarity in their respective strategies.</p>
+	
+    <div class="figure">
+        <img src="img/Figure_2.png" alt="e-series temperatures.">
+        <figcaption>Figure_2</figcaption>
+    </div>
+	
+    <div class="figure">
+        <img src="img/Figure_8.png" alt="c-series temperatures.">
+        <figcaption>Figure_8</figcaption>
+    </div>
+	
+    <div class="figure">
+        <img src="img/Figure_8.png" alt="c-series temperatures.">
+        <figcaption>Figure_14</figcaption>
+    </div>
+	
+    <p>Comparing Figure_2 with Figure_8 the results seem very similar, indicating the strong influence of the directed training. Comparing the c-series in Figure_8 with the r-series in Figure_14 we see a drastic improvement, with most of the r-series becoming stuck.</p>
+
+    <h2>Conclusions</h2>
+    <p>The key thing is that the system demonstrates the ability to infer controls from the raw data and to apply corrective strategies based on what it has learned in an attempt to control the system.</p>
+    <p>The system after the initial exploration tends to fall into a cyclical control strategy where it overcompensates. This can be refined through trace selection and the implementation of the prefactor analysis, control relationship exploration during selection, and more.</p>
+    <p>We see where the system will get into a "rut" and repeat the same strategies over and over getting into a "resonance" with the deterministic diffusion simulation leading to a stagnation in learning.</p>
+    <p>The nature of the system to get "stuck" is due to the trace selection, it is incorrectly associating signals and not prioritizing previously successful strategies and penalizing errors, causing it to double down on a bad strategy. This will be handled through trace selection refinement, the implementation of prefactor analysis, signal association exploration during selection, implementing success and failure reflection/association, and potentially other methods not yet considered or explored.</p>
+    <p>From these datasets we can clearly see the benefit of directed exploration, though random exploration shows the ability to learn enough to develop a control strategy it does not seem to be as effective.</p>
+    <p>Based upon this data the boredom mechanic and exploration mechanic most likely to help the system would be a systematic exploration of the environment, not random flailing.</p>
+    <h2>I dun goofed</h2>
+    <p>I criticize my methodology with the guided training. To set the temperature of the simulation, is that a violation of the goal of unsupervised/self-supervised learning? To manipulate the environment? This realization happened after most of the datasets were generated, so I'm running with it for this project overview due to time constraints but it irks me. Just wanted to put that out there. I've updated the ArcologyX challenge to reflect this, meaning technically Gaia no longer beats Ranran Lvl 1, but that is only a matter of relatively trivial refactoring to fix and a slightly more sophisticated updated exploration algorithm that mimics the random and directed training behavior needed and implements it into their exploration behavior.</p>
+
+    <h2>Need for more advanced exploration mechanisms</h2>
+    <p>Given what has been learned about the guided and random learning we can infer that a more robust exploratory system would be capable of achieving the same results starting with no pre training at all and immediately trying to control the system as it learns as opposed to an observation stage of training before the test.</p>
+    <p>Within the modules internal pipeline there will already be a reflection phase so we'll gather information on the current state that we can use during a curiosity/unsure/boredom phase we place before the output but after the reflection stage. Using this gathered information from reflection we can ensure that we don't retry the same thing twice and it can pursue more intentional exploration strategies.</p>
+
+    <h2>Transformer model adaptation</h2>
+    <p>Drawing from transformer models we can implement a parallel association mechanism alongside the current time-series mechanism.</p>
+    <p>The system has a "short term memory" in the sense it keeps a shift-register for each I/O in the interface. This can be leveraged to associate the oldest actuator values with the delta values that proceed them in the time-series, the [0] index actuators associated with every sensor delta from [1] to [chrono_depth - 1]. Associating each input with all the changes in the system to come in the next chrono_depth steps.</p>
+    <p>When a given sensor has a positive delta within the current input space short term memory array it is then associated with each actuator. When a sensor has a negative delta this is associated with every actuator in the [0] index.</p>
+    <p>Over time the associations to the positive or negative for each sensor will strengthen depending on their frequency. So as the system explores temperatures and finds control strategies is would learn more nuance as the correctly associated deltas overpower the weaker less associated deltas.</p>
+    <p>Then when we use the time-series to generate predictions we can draw upon the associative system to give another mechanism for the system to infer control and refine strategies. Querying the associative network and taking the aggregate delta outputs will yield another value to incorporate into the final output synthesis.</p>
+
+    <h2>Sensor deviation attention mechanism:</h2>
+    <p>Drawing from the idea of weighing tokens based on associations within the context window we can apply this idea of weighing important information as heavier to get the network to focus on it.</p>
+
+</div>
+
+<div class="section">
+    <h1>---=== Appendices ===---</h1>
+    <h2>Appendix A:</h2>
+    <p>The diffusion algorithm is shown here as temperature, use whatever you're diffusing following this:</p>
+    <pre><code>
+&lt;C++&gt;
+
+//Initialization and setup is left out for brevity, this is the core of it, full C++ for the sim can be found on https://github.com/NT4-Wildbranch/proto-Gaia
+std::vector&lt;std::vector&lt;std::vector&lt;c_Cell&gt;&gt;&gt; Map;
+bool Current_Frame;
+bool Next_Frame;
+
+std::vector&lt;c_Sensor&gt; Sensors;
+
+std::vector&lt;c_Actuator&gt; Actuators;
+
+int Width;
+
+int Height;
+
+bool check_XY(int p_X, int p_Y)
+{
+    if (p_X &lt; 0) { return 0; }
+    if (p_Y &lt; 0) { return 0; }
+    if (p_X &gt;= Width) { return 0; }
+    if (p_Y &gt;= Height) { return 0; }
+
+    if (Map[Current_Frame][p_X][p_Y].Type == 0) { return 0; }
+
+    return 1;
+}
+
+void diffuse_Temp(int p_X, int p_Y)
+{
+    float tmp_Total = 0.0;
+    float tmp_Count = 0.0;
+    float tmp_Current = 0.0;
+
+    if (!check_XY(p_X, p_Y)) { return; }
+
+    tmp_Current = Map[Current_Frame][p_X][p_Y].Temp;
+    if (check_XY(p_X + 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X + 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y + 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y + 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X - 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X - 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y - 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y - 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+
+    tmp_Current = Map[Current_Frame][p_X][p_Y].Temp;
+    if (check_XY(p_X, p_Y - 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y - 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X + 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X + 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y + 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y + 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X - 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X - 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+
+    tmp_Current = Map[Current_Frame][p_X][p_Y].Temp;
+    if (check_XY(p_X - 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X - 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y - 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y - 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X + 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X + 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y + 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y + 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+
+    tmp_Current = Map[Current_Frame][p_X][p_Y].Temp;
+    if (check_XY(p_X, p_Y + 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y + 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X - 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X - 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X, p_Y - 1)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X][p_Y - 1].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+    if (check_XY(p_X + 1, p_Y)) { tmp_Current = (tmp_Current + Map[Current_Frame][p_X + 1][p_Y].Temp) / 2; tmp_Count++; tmp_Total += tmp_Current; }
+
+    Map[Next_Frame][p_X][p_Y].Temp = (tmp_Total /= tmp_Count);
+}
+
+
+for (int cou_X = 0; cou_X &lt; (Width); cou_X++)
+{
+    for (int cou_Y = 0; cou_Y &lt; (Height); cou_Y++)
+    {
+        diffuse_Temp(cou_X, cou_Y);
+    }
+}
+&lt;/C++&gt;
+</code></pre>
+
+    <h2>Appendix B:</h2>
+    <p>Parameters to generate the datasets used in this document for yourself</p>
+    <h2>Experiment_Name: e00</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 1</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e01</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 5</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e02</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 10</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e03</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 25</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e03.A</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 25</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 1</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e03.B</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 25</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 2</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e04</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 50</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 1</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e05</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 1</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <p>//This run is actually e05 but I messed up and did e05 with a random run seed of 1 not zero, otherwise that is all that happened here.</p>
+    <h2>Experiment_Name: e05.A</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: e05.B</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 0</p>
+    <p>random_Run_Seed: 2</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r0</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 5</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r1</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 10</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r2</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 25</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r3</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 50</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r4</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r4.A</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9001</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: r4.B</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 0</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9002</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c0</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 5</p>
+    <p>Random Training Depth: 5</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c1</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 10</p>
+    <p>Random Training Depth: 10</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c2</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 25</p>
+    <p>Random Training Depth: 25</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c3</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 50</p>
+    <p>Random Training Depth: 50</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c4</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c4.A</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9001</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c4.B</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 0</p>
+    <p>random_Training_Seed: 9002</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c4.C</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 1</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+
+    <h2>Experiment_Name: c4.D</h2>
+    <p>Chrono_Depth: 4</p>
+    <p>Step_Count: 25</p>
+    <p>Directed Training Depth: 100</p>
+    <p>Random Training Depth: 100</p>
+    <p>random_Run_Seed: 2</p>
+    <p>random_Training_Seed: 9000</p>
+    <p>Prediction APT MSC: 0.99</p>
+    <p>Prediction MC MSC: 0.95</p>
+    <p>Prediction APT Chrono: 0.99</p>
+    <p>Prediction MC Chrono: 0.95</p>
+    <p>Deviation APT MSC: 0.0</p>
+    <p>Deviation MC MSC: 0.95</p>
+    <p>Deviation APT Chrono: 0.0</p>
+    <p>Deviation MC Chrono: 0.95</p>
+    <p>Bulk_Gen: 0</p>
+</div>
+</body>
+</html>
