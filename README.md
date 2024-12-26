@@ -1,5 +1,4 @@
-proto-Gaia is the state of the Gaia OS that has not yet been fully implemented.
-
+Setting up and running an experiment with GaiaOS and viewing the results:
 
 Steps:
 
