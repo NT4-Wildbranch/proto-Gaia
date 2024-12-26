@@ -30,6 +30,8 @@ public:
 
         Depth = p_Depth;
 
+        if (Depth == 0) { Data = NULL; return; }
+
         Data = new uint64_t[Depth];
 
         wipe_Data();

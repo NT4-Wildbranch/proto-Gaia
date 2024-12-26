@@ -56,6 +56,42 @@ void opchr(char p_Char)
 
 }
 
+
+
+
+std::string get_Padded(int p_Digits, int p_Num)
+{
+	std::string tmp_Return;
+	int tmp_Digits = 1;
+	int tmp_Pad = 0;
+
+	int tmp_Num = p_Num;
+	//---std::cout << "\n #." << tmp_Num << ".#";
+
+	while (tmp_Num /= 10)
+	{
+		tmp_Digits++;
+		//---std::cout << "\n ?." << tmp_Digits << ".?";
+	}
+
+	tmp_Pad = p_Digits - tmp_Digits;
+	//---std::cout << "\n _." << tmp_Pad << "._";
+
+	for (int cou_D = 0; cou_D < tmp_Pad; cou_D++)
+	{
+		tmp_Return += "0";
+		//---std::cout << "\n {" << tmp_Return << "}";
+	}
+
+	tmp_Return += std::to_string(p_Num);
+
+	//---std::cout << "\n [" << tmp_Return << "]";
+
+	return tmp_Return;
+}
+
+
+
 //The NeuroTox 4 library.
 namespace NT4
 {
@@ -90,6 +126,6 @@ namespace NT4
 	#include "NT4/c_Construct_Text_Server.h"
 
 	#include "NT4/c_Time_Series_Generator.h"
-	#include "NT4/c_GPT.h"
+	//#include "NT4/c_GPT.h"
 }
 /** @}*/

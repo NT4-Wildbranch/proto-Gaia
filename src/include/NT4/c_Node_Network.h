@@ -17,6 +17,9 @@ public:
 	//It's slow to do it that way but we won't be killing the network except at shutdown.
 	uint64_t Node_Count;
 
+	//The current widest row in the network on last evaluation.
+	float Fat_Tier;
+
 	//This holds the state trees for each construct.
 	//Even if two constructs have the same state input you may want to keep them separate, so you need multiple state trees.
 	//The state tree does not create new nodes, it only tracks them.
@@ -38,6 +41,7 @@ public:
 		new_Node();
 		Root->set_Type(0);
 		Root->bind_State(0);
+		Fat_Tier = 0;
 	}
 
 
@@ -185,7 +189,7 @@ public:
 	}
 
 	//Gets an upper tier node based on the given legs.
-	c_Node* get_Upper_Tier_Node(c_Node** p_Legs, int p_Count, int p_Type)
+	c_Node* get_Upper_Tier_Node(c_Node** p_Legs, int p_Count, int p_Type, int p_Tier = 0)
 	{
 		if (p_Legs == NULL) { return NULL; }
 		if (p_Count == 0) { return NULL; }
@@ -213,6 +217,8 @@ public:
 			create_Connections(tmp_Node, p_Legs, p_Count);
 
 			tmp_Node->set_Type(p_Type);
+
+			tmp_Node->Tier = p_Tier;
 		}
 
 		//std::cout << "\n  End: " << tmp_Node;
@@ -261,6 +267,18 @@ public:
 			return Nodes.get_Current_Node_NAdd();
 		}
 		return NULL;
+	}
+
+	//Gets the current fat row.
+	uint64_t get_Fat_Tier()
+	{
+		return Fat_Tier;
+	}
+
+	//Sets the fat row.
+	void set_Fat_Tier(uint64_t p_Fat_Tier)
+	{
+		Fat_Tier = p_Fat_Tier;
 	}
 
 	//Iterates through every node and outputs their bp_O()

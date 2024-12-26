@@ -105,6 +105,7 @@ public:
 		{
 			return Output_Depth_3D;
 		}
+		return 0;
 	}
 
 	c_Trace * get_Output(const int p_Output)
@@ -246,6 +247,15 @@ public:
 	double get_Charging_Tier()
 	{
 		return Charging_Tier;
+	}
+
+	void output_Config()
+	{
+		std::cout << "\n Config:";
+		std::cout << "\n - Charging_Tier: " << Charging_Tier;
+		std::cout << "\n - Base_Charge: " << get_Base_Charge();
+		std::cout << "\n - Modifier_Charge: " << get_Modifier_Charge();
+		std::cout << "\n - Action_Potential_Threshold: " << get_Action_Potential_Threshold();
 	}
 
 	//Associate the CAN with a network from which to draw nodes.
@@ -494,6 +504,7 @@ public:
 		//std::cout << "\n   --==   /Output_Traces   ==--";
 	}
 
+	virtual void output_Scaffold_Tops()=0;
 
 	//Each address is typecast to a char to give a pseudo-unique look to each node. For monke brain.
 	virtual void output_Scaffold_Char()=0;

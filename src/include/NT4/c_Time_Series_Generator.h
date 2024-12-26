@@ -85,7 +85,7 @@ public:
         }
     }
 
-    uint64_t* get_uint_Input(int p_Chrono)
+    std::vector<uint64_t> get_uint_Input(int p_Chrono)
     {
         std::vector<uint64_t> tmp_Data(Input[p_Chrono].size());
 
@@ -93,7 +93,7 @@ public:
         {
             tmp_Data[cou_D] = Input[p_Chrono][cou_D].U;
         }
-        return tmp_Data.data();
+        return tmp_Data;
     }
 
     void copy_Input()
@@ -283,7 +283,7 @@ public:
     std::vector<c_Time_Series_Reference_Frame> RF;
 
     //Depth of the Chrono array.
-    int Chrono_Depth;
+    int Chrono_Depth; 
 
     //The number of inputs to the MSC, the count of raw constructs.
     int Raw_Depth;
@@ -507,7 +507,7 @@ public:
         NT4_Core.set_Input_uint("MSC", Raw_Depth, (tmp_Gathered_MSC.data()));
     }
 
-    uint64_t* get_uint_Input(int p_RF, int p_Chrono)
+    std::vector<uint64_t> get_uint_Input(int p_RF, int p_Chrono)
     {
         //---validate_RF(p_RF);
 
@@ -578,7 +578,6 @@ public:
 
         //---output_IO();
 
-        //Encodes the Input.
         query_Arrays(p_RF);
 
         //system("PAUSE");
@@ -594,7 +593,7 @@ public:
 
         //---std::cout << "\n\n\n [[[ Historical_Prediction ]]]:\n\n";
 
-        //---output_Historical_Projections();
+        //output_Historical_Projections();
     }
 
     double get_Input(int p_RF, int p_Chrono, int p_Index)
@@ -607,11 +606,11 @@ public:
         std::vector<uint64_t> tmp_Chron(Chrono_Depth);
         NT4_Core.set_Input_uint("Chrono", Chrono_Depth, tmp_Chron.data());
 
-        //---std::cout << "\n\n\n query_Array()";
-        //---std::cout << "\n Chrono_Depth: " << Chrono_Depth;
+        //---std::cout << "\n\n\n query_Array()"; std::cout.flush();
+        //---std::cout << "\n Chrono_Depth: " << Chrono_Depth; std::cout.flush();
         for (int cou_Step = 0; cou_Step < Chrono_Depth; cou_Step++)
         {
-            //---output_Interm(p_RF);
+            //---output_Interm(p_RF); std::cout.flush();
 
             NT4_Core.reset_Output("Chrono");
             NT4_Core.gather_Treetops("Chrono");
@@ -619,15 +618,15 @@ public:
             Chrono_Current = cou_Step;
             RF[p_RF].Chrono_Current = cou_Step;
 
-            //---std::cout << "\n -+- Step[" << cou_Step << "]";
+            //---std::cout << "\n -+- Step[" << cou_Step << "]"; std::cout.flush();
             //[0] is the newest so we read the chrono in the same way it appears, oldest to newest.
             for (int cou_Chrono = 0; cou_Chrono < (Chrono_Depth - 1); cou_Chrono++)
             {
-                //---std::cout << "\n -+- -+- Chrono[" << cou_Chrono << "]";
+                //---std::cout << "\n -+- -+- Chrono[" << cou_Chrono << "]"; std::cout.flush();
                 for (int cou_Index = 0; cou_Index < Raw_Depth; cou_Index++)
                 {
-                    //---std::cout << "\n -+- -+- -+- Index[" << cou_Index << "]";
-                    //---std::cout << "\n -+- -+- -+- -+- Input_Interm[" << (cou_Step + cou_Chrono) << "][" << cou_Index << "]: " << (RF[p_RF].Input_Interm[cou_Step + cou_Chrono][cou_Index].D);
+                    //---std::cout << "\n -+- -+- -+- Index[" << cou_Index << "]"; std::cout.flush();
+                    //---std::cout << "\n -+- -+- -+- -+- Input_Interm[" << (cou_Step + cou_Chrono) << "][" << cou_Index << "]: " << (RF[p_RF].Input_Interm[cou_Step + cou_Chrono][cou_Index].D); std::cout.flush();
                     u_Data tmp_Bit;
                     tmp_Bit.U = 0;
                     tmp_Bit.U = RF[p_RF].Input_Interm[cou_Step + cou_Chrono][cou_Index].U;

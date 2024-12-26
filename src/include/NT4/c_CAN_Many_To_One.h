@@ -114,7 +114,7 @@ public:
 		if (p_How == "Encode")
 		{
 			//We request a node that links the entire state tier together.
-			Scaffold[1][0] = NNet->get_Upper_Tier_Node(Scaffold[0], State_Depth, 2);
+			Scaffold[1][0] = NNet->get_Upper_Tier_Node(Scaffold[0], State_Depth, 2, 1);
 			Scaffold[1][0]->RC++;
 			Scaffold[1][0]->set_Type(2);
 		}
@@ -222,7 +222,7 @@ public:
 
 		double tmp_Charge = 0.0;
 		double tmp_H_Charge = tmp_Buffman.get_Treetops_Highest_Charge();
-		if (tmp_H_Charge == 0) { tmp_H_Charge == 1.0; }
+		if (tmp_H_Charge == 0) { tmp_H_Charge = 1.0; }
 
 		c_Charging_Linked_List* tmp_Current_LL = NULL;
 		tmp_Current_LL = tmp_Buffman.Treetops.Root;
@@ -452,8 +452,6 @@ public:
 
 		//Decoupling gather_Treetops so that complex queries can be done.
 		//gather_Treetops();
-
-
 	}
 
 	//This allows for passing unordered sets of nodes
@@ -510,6 +508,10 @@ public:
 		std::cout << "\n[" << char(Scaffold[1][0]) << "]";
 	}
 
+	void output_Scaffold_Tops()
+	{
+
+	}
 
 
 	//Outputs the scaffold as character representing the address. Currently only 1D supports this.

@@ -47,6 +47,18 @@ public:
 
 		//These are the IDs of the lower constructs to connect to.
 		int* Connections;
+
+		s_Construct()
+		{
+			Name = "UNINITIALIZED";
+			Input_File = "";
+			Config_File = "";
+			Output_File = "";
+			CAN = NULL;
+			CAN_Type = "UNINITIALIZED";
+			Connection_Count = 0;
+			Connections = NULL;
+		}
 	};
 
 	s_Construct** Constructs;
@@ -200,7 +212,6 @@ public:
 	{
 		return Nodes.get_Node_Ref_By_NID(p_NID);
 	}
-
 
 
 
@@ -480,7 +491,11 @@ public:
 	//Suggested for use before encoding (if using learning mode and not locked_to_initial_training_mode) otherwise it will also find the current trace as the perfect match.
 	void query(int p_Construct, int p_Charging_Style = -1, int p_Leg = 0, int* p_Legs = NULL)
 	{
+		if (p_Charging_Style == 4) { wipe_Network_Charges(); output_Network_Charges(); }
+		
 		Constructs[p_Construct]->CAN->query(p_Charging_Style, p_Leg, p_Legs);
+
+		if (p_Charging_Style == 4) { output_Network_Charges(); }
 	}
 
 
@@ -698,6 +713,14 @@ public:
 
 
 	//==--- DIRECT_HOOK ---==//
+	//The output trace set is output.
+	void output_Output_Int(int p_Construct)
+	{
+		Constructs[p_Construct]->CAN->output_Output(3);
+	}
+
+
+	//==--- DIRECT_HOOK ---==//
 	//Each address is typecast to a char to give a pseudo-unique look to each node. For monke brain.
 	void output_Scaffold_Char(int p_Construct)
 	{
@@ -736,6 +759,276 @@ public:
 	//     ---======================---
 	//      ---====================---
 
+
+	//Used to wipe the charges of the network.
+	void wipe_Network_Charges()
+	{
+		c_Node* tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+
+		while (tmp_Node != NULL)
+		{
+			tmp_Node->Charge = 0;
+
+			tmp_Node = tmp_Node->Next;
+		}
+	}
+
+	void output_Network_Charges(std::string p_FName_Prefix = "")
+	{
+		std::cout << "\n Charges:";
+		c_Node* tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+		
+		std::string tmp_OFName = "";
+
+		if (p_FName_Prefix != "")
+		{
+			tmp_OFName = "./Testing/" + p_FName_Prefix + "node_Charge_Output.ssv";
+		}
+		else
+		{
+			tmp_OFName = "./Testing/node_Charge_Output.ssv";
+		}
+
+		std::ofstream OF;
+		//std::ofstream OFXY;
+		//std::ofstream OFRC;
+		OF.open(tmp_OFName, std::ios::app);
+		//OFXY.open("./Testing/Node_Network_Output/node_Charge_Output_XY.dat", std::ios::app);
+		//OFRC.open("./Testing/Node_Network_Output/node_RC_Output.dat", std::ios::app);
+
+		int tmp_Cur = 0;
+		char tmp_Char = ' ';
+		
+		int tmp_Top_Tier = 0;
+
+		tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+		
+		std::cout << "\n Finding Top_Tier & Widest_Tier...";
+		while (tmp_Node != NULL)
+		{
+			if (tmp_Top_Tier <= tmp_Node->Tier)
+			{
+				tmp_Top_Tier = tmp_Node->Tier + 1;
+			}
+
+			tmp_Node = tmp_Node->Next;
+		}
+
+		std::cout << "Top_Tier: " << tmp_Top_Tier;
+
+		std::vector<int> Skipdex;
+		Skipdex.resize(tmp_Top_Tier);
+
+		float tmp_Skipval = 0.0;
+		float tmp_Skipcur = 0.0;
+
+		std::cout << "\n SkipDex Building...";
+
+		for (int cou_T = 0; cou_T < tmp_Top_Tier; cou_T++)
+		{
+			Skipdex[cou_T] = 0;
+		}
+
+		tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+
+		while (tmp_Node != NULL)
+		{
+			Skipdex[tmp_Node->Tier]++;
+
+			if (Nodes.Fat_Tier < Skipdex[tmp_Node->Tier])
+			{ 
+				Nodes.Fat_Tier = Skipdex[tmp_Node->Tier];
+			}
+
+			tmp_Node = tmp_Node->Next;
+
+		}
+
+		std::cout << "\n Constructing XY Mapping...";
+
+		std::vector<int> Skipdex_Cur;
+		std::vector<int> Skipdex_Val;
+
+		std::vector<std::vector<std::string>> Skipdex_Out;
+		//std::vector<std::vector<std::string>> Skipdex_RC_Out;
+		//std::vector<std::vector<std::string>> Skipdex_XY_Out;
+
+		Skipdex_Cur.resize(tmp_Top_Tier);
+		Skipdex_Val.resize(tmp_Top_Tier);
+
+		Skipdex_Out.resize(tmp_Top_Tier);
+		//Skipdex_RC_Out.resize(tmp_Top_Tier);
+		//Skipdex_XY_Out.resize(tmp_Top_Tier);
+
+		std::cout << "Allocating Memory...";
+		for (int cou_T = 0; cou_T < tmp_Top_Tier; cou_T++)
+		{
+			Skipdex_Cur[cou_T] = 0.0;
+			Skipdex_Val[cou_T] = Nodes.Fat_Tier / Skipdex[cou_T];
+
+			Skipdex_Out[cou_T].resize(Nodes.Fat_Tier);
+			//Skipdex_RC_Out[cou_T].resize(Nodes.Fat_Tier);
+			//Skipdex_XY_Out[cou_T].resize(Nodes.Fat_Tier);
+
+			/*
+			for (int cou_FT = 0; cou_FT < Nodes.Fat_Tier; cou_FT++)
+			{
+				Skipdex_Out[cou_T][cou_FT] = " 0";
+				Skipdex_RC_Out[cou_T][cou_FT] = " 0";
+				Skipdex_XY_Out[cou_T][cou_FT] = "\n(" + std::to_string(cou_FT) + ", " + std::to_string(cou_T) + ") 0";
+			}
+			*/
+		}
+
+		tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+
+		std::cout << "Calculating XY...";
+		while (tmp_Node != NULL)
+		{
+			Skipdex_Out[tmp_Node->Tier][int(Skipdex_Cur[tmp_Node->Tier])] = " " + std::to_string(tmp_Node->Charge);
+			//Skipdex_RC_Out[tmp_Node->Tier][int(Skipdex_Cur[tmp_Node->Tier])] = " " + std::to_string(tmp_Node->RC);
+			//Skipdex_XY_Out[tmp_Node->Tier][int(Skipdex_Cur[tmp_Node->Tier])] = "\n(" + std::to_string(int(Skipdex_Cur[tmp_Node->Tier])) + ", " + std::to_string(tmp_Node->Tier) + ") " + std::to_string(tmp_Node->NID);
+
+			tmp_Node->Index = int(Skipdex_Cur[tmp_Node->Tier]);
+
+			Skipdex_Cur[tmp_Node->Tier] += Skipdex_Val[tmp_Node->Tier];
+
+			if (Skipdex_Cur[tmp_Node->Tier] >= Nodes.Fat_Tier) { Skipdex_Cur[tmp_Node->Tier] = Nodes.Fat_Tier - 1; }
+
+			//Skipdex_Cur[tmp_Node->Tier]++;
+
+			tmp_Node = tmp_Node->Next;
+		}
+
+		std::cout << "Writing Files...";
+		/*
+		for (int cou_I = 0; cou_I < Nodes.Fat_Tier; cou_I++)
+		{
+			OF << " 0";
+			OFRC << " 0";
+		}
+		*/
+		for (int cou_T = 0; cou_T < tmp_Top_Tier; cou_T++)
+		{
+			OF << "\n";
+			//OFXY << "\n";
+			//OFRC << "\n";
+
+			OF << " " << cou_T << " ";
+			//OFRC << " " << cou_T << " ";
+
+			for (int cou_I = 0; cou_I < Nodes.Fat_Tier; cou_I++)
+			{
+				if (Skipdex_Out[cou_T][cou_I] == "") 
+				{
+					OF << " 0";
+					//OFRC << " 0";
+					//OFXY << "\n(" + std::to_string(cou_I) + ", " + std::to_string(cou_T) + ") 0";
+					continue;
+				}
+
+				OF << Skipdex_Out[cou_T][cou_I];
+				//OFRC << Skipdex_RC_Out[cou_T][cou_I];
+				//OFXY << Skipdex_XY_Out[cou_T][cou_I];
+
+			}
+		}
+		/*
+		OF << "\n";
+		OFXY << "\n";
+		OFRC << "\n";
+		for (int cou_I = 0; cou_I < Nodes.Fat_Tier; cou_I++)
+		{
+			OF << " 0";
+			OFRC << " 0";
+		}
+		OF << "\n";
+		OFXY << "\n";
+		OFRC << "\n";*/
+
+		OF.close();
+		//OFRC.close();
+		//OFXY.close();
+
+		/*
+		tmp_Node = NULL;
+		tmp_Node = Nodes.Root;
+
+		for (int cou_T = 0; cou_T < tmp_Top_Tier; cou_T++)
+		{
+			tmp_Node = NULL;
+			tmp_Node = Nodes.Root;
+			
+			OF << "\n";
+			OFXY << "\n";
+			OFRC << "\n";
+			//std::cout << "\n";
+
+			tmp_Skipcur = 0.0;
+			tmp_Skipval = Nodes.Fat_Tier / Skipdex[cou_T];
+
+			std::vector<std::string> tmp_Out;
+			std::vector<std::string> tmp_RC_Out;
+			std::vector<std::string> tmp_XY_Out;
+			tmp_Out.resize(Nodes.Fat_Tier);
+			tmp_RC_Out.resize(Nodes.Fat_Tier);
+			tmp_XY_Out.resize(Nodes.Fat_Tier);
+			
+			for (int cou_FT = 0; cou_FT < Nodes.Fat_Tier; cou_FT++)
+			{
+				tmp_Out[cou_FT] = " 0";
+				tmp_RC_Out[cou_FT] = " 0";
+				tmp_XY_Out[cou_FT] = "\n(" + std::to_string(cou_FT) + ", " + std::to_string(cou_T) + ") 0";
+			}
+
+
+
+			tmp_Cur = 0;
+
+
+			while (tmp_Node != NULL)
+			{
+				if (tmp_Node->Tier == cou_T)
+				{
+					tmp_Out[int(tmp_Skipcur)] = " " + std::to_string(tmp_Node->Charge);
+
+					tmp_RC_Out[int(tmp_Skipcur)] = " " + std::to_string(tmp_Node->RC);
+
+					tmp_XY_Out[int(tmp_Skipcur)] = "\n(" + std::to_string(int(tmp_Skipcur)) + ", " + std::to_string(tmp_Node->Tier) + ") " + std::to_string(tmp_Node->NID);
+
+					tmp_Node->Index = int(tmp_Skipcur);
+
+					tmp_Skipcur += tmp_Skipval;
+
+					if (tmp_Skipcur >= Nodes.Fat_Tier) { (tmp_Skipcur = Nodes.Fat_Tier - 1); }
+
+					tmp_Cur++;
+				}
+
+				tmp_Node = tmp_Node->Next;
+			}
+
+			OF << " " << cou_T << " ";
+			OFRC << " " << cou_T << " ";
+
+			for (int cou_FT = 0; cou_FT < Nodes.Fat_Tier; cou_FT++)
+			{
+				OF << tmp_Out[cou_FT];
+				OFRC << tmp_RC_Out[cou_FT];
+				OFXY << tmp_XY_Out[cou_FT];
+			}
+		}
+		OF.close();
+		OFRC.close();
+		OFXY.close();
+		*/
+		std::cout << "Complete...";
+	}
 
 
 	//    ---======================================---
@@ -1094,7 +1387,7 @@ public:
 
 	bool check_Output_Bounds(int p_Construct, int p_Output_Index)
 	{
-		if (!Constructs[p_Construct]->CAN->get_Output_Depth() <= p_Output_Index) 
+		if (!(Constructs[p_Construct]->CAN->get_Output_Depth() <= p_Output_Index)) 
 		{
 			std::cerr << "\n   --(O.o)~~   ERROR: check_Output_Bounds(p_Construct = " << Constructs[p_Construct]->Name << ", p_Output_Index = " << p_Output_Index << ")";
 
@@ -2001,6 +2294,11 @@ public:
 
 		config_File.close();
 		return 1;
+	}
+
+	void output_Config(int p_Construct)
+	{
+		Constructs[p_Construct]->CAN->output_Config();
 	}
 
 	void set_Input_Charging_Mask(const int p_Construct, std::vector<double> p_Input_Charging_Mask)

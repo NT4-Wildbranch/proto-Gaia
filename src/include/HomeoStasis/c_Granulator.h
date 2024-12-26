@@ -102,6 +102,6 @@ public:
 		}
 
 		//If you find this value then it means the input is out of bounds.
-		return 9999;
+		return -0.123456;
 	}
 };

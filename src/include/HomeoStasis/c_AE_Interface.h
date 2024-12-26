@@ -63,6 +63,8 @@ public:
         Delta = NULL;
 
         Depth = 0;
+
+        Goal_Deviation = 0;
     }
 
     void set_Depth(int p_Depth)

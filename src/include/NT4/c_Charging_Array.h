@@ -541,6 +541,8 @@ public:
             //---std::cout << "\n --- tmp_Charge_Percentage " << tmp_Charge_Percentage << " = ((tmp_LL->Charge " << tmp_LL->Charge << "  * Modifier_Charge " << Modifier_Charge << " ) / Previous_Highest_Charge " << Previous_Highest_Charge << " );";
             tmp_Charge = double(tmp_Charge_Percentage * Base_Charge);
 
+            tmp_LL->NID->Charge = tmp_Charge;
+
             if (tmp_Charge < (Base_Charge * Action_Potential_Threshold)) { tmp_LL = tmp_LL->Next; continue; }
 
             //We use leg index selection instead of L/R
@@ -575,6 +577,8 @@ public:
     //Use this then gather and begin charging loop.
     void charge_Given_Leg(c_Node* p_Node, double p_Charge = 10.00, int p_Leg = 0)
     {
+        p_Node->Charge = p_Charge;
+
         //Search for the submitted node, if found add the charge.
         if (p_Leg < p_Node->Axon_Hillock_Count)
         {

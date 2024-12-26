@@ -85,7 +85,7 @@ public:
 		return Base.get_Output_Charge(get_Construct_ID(p_Construct), p_Output);
 	}
 
-	float get_Output_Treetop_NID(std::string p_Construct, int p_Output)
+	uint64_t get_Output_Treetop_NID(std::string p_Construct, int p_Output)
 	{
 		return Base.get_Output_Treetop_NID(get_Construct_ID(p_Construct), p_Output);
 	}
@@ -395,7 +395,14 @@ public:
 		if (tmp_Node != NULL) { return tmp_Node->NID; }
 		return 0;
 	}
-  
+
+
+	//---==  wipe_Network_Charges  ==---//
+	//Wipes the current network charges, this is network wide.
+	void wipe_Network_Charges()
+	{
+		Base.wipe_Network_Charges();
+	}
 
 	//---==  output_BP  ==---//
 	//Iterates through every node and outputs their bp_O()
@@ -423,8 +430,13 @@ public:
 	{
 		Base.output_Node_Network();
 	}
-
-
+  
+	//---==  output_Network_Charges  ==---//
+	//Outputs all of the charges as characters.
+	void output_Network_Charges(std::string p_FName_Prefix = "")
+	{
+		Base.output_Network_Charges(p_FName_Prefix);
+	}
 
 	//    ---=========---
 	//   ---===========---
@@ -626,6 +638,7 @@ public:
 	}
 
 
+
 	//---==  output_Output [Construct_ID]  ==---//
 	//The output trace set is output.
 	void output_Output_uint(std::string p_Construct)
@@ -636,6 +649,12 @@ public:
 	void output_Output_Double(std::string p_Construct)
 	{
 		Base.output_Output_Double(get_Construct_ID(p_Construct));
+	}
+	
+	
+	void output_Output_Int(std::string p_Construct)
+	{
+		Base.output_Output_Int(get_Construct_ID(p_Construct));
 	}
 
 
@@ -882,6 +901,11 @@ public:
 	void output_Constructs()
 	{
 		Base.output_Constructs();
+	}
+
+	void output_Construct_Config(std::string p_Construct)
+	{
+		Base.output_Config(get_Construct_ID(p_Construct));
 	}
 
 	//      ---==================================---

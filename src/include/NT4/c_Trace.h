@@ -165,7 +165,7 @@ public:
     void shift_Data()
     {
         //Shift each array one index towards [0].
-        for (int cou_Index = 0; cou_Index < (Pattern.size() - 1); cou_Index++)
+        for (uint64_t cou_Index = 0; cou_Index < (Pattern.size() - 1); cou_Index++)
         {
             Pattern[cou_Index] = Pattern[cou_Index + 1];
         }
@@ -188,6 +188,7 @@ public:
             if (p_Type == 0){ std::cout << " " << char(Pattern[cou_Index]); }
             if (p_Type == 1){ std::cout << " " << Pattern[cou_Index]; }
             if (p_Type == 2) { tmp_Dat.U = Pattern[cou_Index]; std::cout << " " << tmp_Dat.D; }
+            if (p_Type == 3) { std::cout << " " << int(Pattern[cou_Index]); }
         }
     }
 };

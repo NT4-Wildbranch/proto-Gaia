@@ -42,6 +42,11 @@ public:
     //(0: NULL), (1: State), (2: Branch), (3: Treetop), (4: State Treetop)
     short int Type;
 
+    float Charge;
+
+    int Tier;
+    int Index;
+
     c_Node()
     {
         NID = 0;
@@ -60,6 +65,9 @@ public:
         Dendrite_Weights = NULL;
         Dendrite_Count = 0;
 
+        Tier = 0;
+        Index = 0;
+
         //Reinforcement Counters.
         RC = 1.0;
 
@@ -68,6 +76,8 @@ public:
 
         //The type is 0 to start with.
         Type = 0;
+
+        Charge = 0.0;
     }
 
     //(0: State), (1: Branch), (2: Treetop), (3: State/Treetop)

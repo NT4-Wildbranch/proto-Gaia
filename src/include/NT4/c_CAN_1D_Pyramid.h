@@ -132,7 +132,7 @@ public:
 				if (p_How == "Encode")
 				{
 					//We request a node that links 2 nodes together.
-					Scaffold[cou_T][cou_Index] = NNet->get_Upper_Tier_Node(&(Scaffold[cou_T - 1][cou_Index]), 2, 1);
+					Scaffold[cou_T][cou_Index] = NNet->get_Upper_Tier_Node(&(Scaffold[cou_T - 1][cou_Index]), 2, 1, cou_T);
 					Scaffold[cou_T][cou_Index]->RC++;
 					Scaffold[cou_T][cou_Index]->rectify_Double_Legged_Nodes(); //Only need to do this for tiers 1+ as tier 0 doesn't have dendrites in this CAN.
 				}
@@ -200,11 +200,12 @@ public:
 		//---std::cout << "\n\n-- End Encoding --\n\n";
 	}
 
+	
+
 	//Style determines whether it charges with normal submission of raw, or if it does the specific leg charging for Chrono.
 	//Assumes the CAN is setup.
 	void charge_Buffers(int p_Style = -1, int p_Leg = 0, int * p_Legs = NULL)
 	{
-
 		tmp_Buffman.reset();
 
 		tmp_Buffman.Input_Position = 0;
@@ -237,6 +238,10 @@ public:
 					{
 						//p_Leg is used here as the count of elements in p_Legs[].
 						tmp_Buffman.charge_Given_Legs(Scaffold[cou_T][cou_Input], p_Leg, p_Legs, (tmp_Buffman.get_Base_Charge()));
+					}
+					if (p_Style == 4)
+					{
+						tmp_Buffman.submit(Scaffold[cou_T][cou_Input], (tmp_Buffman.get_Base_Charge()));
 					}
 				}
 			}
@@ -275,6 +280,7 @@ public:
 		tmp_Current_LL = tmp_Buffman.Treetops.Root;
 
 		Output.clear();
+		Output.resize(tmp_Buffman.Treetops.Depth);
 
 		int tmp_Current_Index = 0;
 
@@ -341,7 +347,7 @@ public:
 
 		c_Node* tmp_Node = NNet->get_Node_Ref_By_NID(p_NID);
 
-		if (tmp_Node == NULL) { std::cerr << "\n\n   v(o.O)V   Error in backpropagage_NID_Into_Given_Index, Node " << p_NID << " not found!"; }
+		if (tmp_Node == NULL) { std::cerr << "\n\n   v(o.O)V   Error in backpropagage_NID_Into_Given_Index, Node " << p_NID << " not found!"; return; }
 
 		//Get the pattern into a linked list
 		tmp_Node->bp_Trace_O(&tmp_Pattern);
@@ -574,6 +580,121 @@ public:
 		}
 	}
 
+	void output_Scaffold_Tops()
+	{
+		std::vector<uint64_t> tmp_NID[2];
+		std::vector<int> tmp_Index;
+		std::vector<int> tmp_Tier;
+
+		std::vector<uint64_t> xmp_NID;
+		std::vector<int> xmp_Index;
+		std::vector<int> xmp_Tier;
+
+		tmp_NID[0].resize(State_Depth);
+		tmp_NID[1].resize(State_Depth);
+		tmp_Index.resize(State_Depth);
+		tmp_Tier.resize(State_Depth);
+
+
+
+		for (int cou_T = (State_Depth - 1); cou_T >= 0; cou_T--)
+		{
+			std::cout << "\nT<" << cou_T << "> [";
+			for (int cou_Index = 0; cou_Index < (State_Depth - cou_T); cou_Index++)
+			{
+				std::cout << char(Scaffold[cou_T][cou_Index]);
+
+				if (tmp_NID[0][cou_Index] == 0)
+				{
+					if (Scaffold[cou_T][cou_Index] != NULL)
+					{
+						std::cout << "\n\n[" << cou_Index << "]";
+
+						for (int cou_Fill = cou_Index; cou_Fill <= (cou_Index + cou_T); cou_Fill++)
+						{
+							tmp_NID[0][cou_Fill] = Scaffold[cou_T][cou_Index]->NID;
+							//tmp_NID[1][cou_Fill] = 0;
+							tmp_Index[cou_Fill] = cou_Index;
+							tmp_Tier[cou_Fill] = cou_T;
+
+							std::cout << " >NID: " << tmp_NID[0][cou_Index];
+							std::cout << " >NID: " << tmp_NID[1][cou_Index];
+							std::cout << " >Index: " << tmp_Index[cou_Index];
+							std::cout << " >Tier: " << tmp_Tier[cou_Index];
+							std::cout << " >[___]   ";
+						}
+						tmp_NID[1][cou_Index] = Scaffold[cou_T][cou_Index]->NID;
+
+						std::cout << " NID: " << tmp_NID[0][cou_Index];
+						std::cout << " NID: " << tmp_NID[1][cou_Index];
+						std::cout << " Index: " << tmp_Index[cou_Index];
+						std::cout << " Tier: " << tmp_Tier[cou_Index];
+						std::cout << " [___]   ";
+
+						xmp_NID.push_back(Scaffold[cou_T][cou_Index]->NID);
+						xmp_Index.push_back(cou_Index);
+						xmp_Tier.push_back(cou_T);
+					}
+				}
+			}
+			std::cout << "]";
+		}
+
+		for (int cou_Index = 0; cou_Index < State_Depth; cou_Index++)
+		{
+			std::cout << "\n[" << cou_Index << "]";
+			std::cout << " NID: " << tmp_NID[0][cou_Index];
+			std::cout << " NID: " << tmp_NID[1][cou_Index];
+			std::cout << " Index: " << tmp_Index[cou_Index];
+			std::cout << " Tier: " << tmp_Tier[cou_Index];
+			std::cout << " [___]";
+			Scaffold[tmp_Tier[cou_Index]][tmp_Index[cou_Index]]->bp_O(0);
+			std::cout << "[___]  ";
+		}
+		std::cout << "\n\n";
+		for (int cou_Index = 0; cou_Index < State_Depth; cou_Index++)
+		{
+			if (tmp_NID[1][cou_Index] != NULL)
+			{
+				Scaffold[tmp_Tier[cou_Index]][tmp_Index[cou_Index]]->bp_O(0);
+			}
+		}
+		
+		bool tmp_Done = false;
+		uint64_t xtmp_NID = 0;
+		int xtmp_Index = 0;
+		int xtmp_Tier = 0;
+
+		while (!tmp_Done)
+		{
+			tmp_Done = true;
+
+			for (int cou_Index = 1; cou_Index < xmp_NID.size(); cou_Index++)
+			{
+				if (xmp_Index[cou_Index - 1] > xmp_Index[cou_Index])
+				{
+					xtmp_Tier = xmp_Tier[cou_Index - 1];
+					xtmp_Index = xmp_Index[cou_Index - 1];
+
+					xmp_Tier[cou_Index - 1] = xmp_Tier[cou_Index];
+					xmp_Index[cou_Index - 1] = xmp_Index[cou_Index];
+
+					xmp_Tier[cou_Index] = xtmp_Tier;
+					xmp_Index[cou_Index] = xtmp_Index;
+
+					tmp_Done = false;
+				}
+			}
+		}
+
+		std::cout << "\n\n";
+		for (int cou_Index = 0; cou_Index < xmp_NID.size(); cou_Index++)
+		{
+			//std::cout << "\n [" << cou_Index << "] ___ " << xmp_Tier[cou_Index] << " <___> " << xmp_Index[cou_Index];
+			Scaffold[xmp_Tier[cou_Index]][xmp_Index[cou_Index]]->bp_O(0);
+		}
+	}
+
 	//Outputs the scaffold as character representing the address. Currently only 1D supports this.
 	void output_Scaffold_Symbols(int p_Type = 0)
 	{
@@ -591,7 +712,7 @@ public:
 				{
 					std::cout << "NULL";
 				}
-			std::cout << "]";
+				std::cout << "]";
 			}
 		}
 	}

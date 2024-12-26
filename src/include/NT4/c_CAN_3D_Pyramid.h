@@ -765,6 +765,10 @@ public:
 		}
 	}
 
+	void output_Scaffold_Tops()
+	{
+
+	}
 
 	//Outputs the scaffold as character representing the address. Currently only 1D supports this.
 	void output_Scaffold_Symbols(int p_Type = 0)

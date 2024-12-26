@@ -266,6 +266,23 @@ public:
         return tmp_Return;
     }
 
+    std::vector<std::vector<float>> get_Deviation_Set()
+    {
+        std::vector<std::vector<float>> tmp_Return;
+        tmp_Return.resize(Afferent_Count);
+
+        for (int cou_A = 0; cou_A < Afferent_Count; cou_A++)
+        {
+            tmp_Return[cou_A].resize(Afferent[cou_A]->Depth);
+
+            for (int cou_D = 0; cou_D < Afferent[cou_A]->Depth; cou_D++)
+            {
+                tmp_Return[cou_A][cou_D] = Afferent[cou_A]->Deviation[cou_D];
+            }
+        }
+        return tmp_Return;
+    }
+
     float get_Current_Afferent_Deviation(int p_Afferent)
     {
         return Afferent[p_Afferent]->Deviation[Afferent[p_Afferent]->Depth - 1];
@@ -349,12 +366,15 @@ public:
     //Boredom mechanic.
     int Previous_Node_Count;
 
+    int Tick_Count;
+
     c_Homeostasis_Module()
     {
         No_Streak = 0;
         No_Streak_On = 0;
         No_Streak_Off = 0;
         Previous_Node_Count = 0;
+        Tick_Count = 0;
     }
 
     void init(int p_Chrono_Depth)
@@ -366,7 +386,8 @@ public:
     //Call after you've registered all your afferent and efferent.
     void init_TSG(int p_Chrono_Depth)
     {
-        int tmp_IO_Depth = ((IO.Afferent_Count) * 3) + ((IO.Efferent_Count) * 3);
+        //int tmp_IO_Depth = ((IO.Afferent_Count) * 3) + ((IO.Efferent_Count) * 3);
+        int tmp_IO_Depth = ((IO.Afferent_Count) * 3) + (IO.Efferent_Count);
 
         TSG.init(p_Chrono_Depth, tmp_IO_Depth, 5);
     }
@@ -377,7 +398,7 @@ public:
         TSG.encode(0);
     }
 
-    void write_Bulk(std::string p_FName)
+    void write_Bulk(std::string p_FName, int p_Tick)
     {
         std::vector<std::vector<std::vector<NT4::s_Out>>> tmp_Bulk;
 
@@ -388,37 +409,40 @@ public:
         std::ofstream BSF_M;
         std::ofstream BSF_C;
         std::ofstream BSF_R;
-        std::string tmp_BName_D = "./GaiaTesting/bulk/" + p_FName + ".Primitive.blk";
-        std::string tmp_BName_M = "./GaiaTesting/bulk/" + p_FName + ".Match.blk";
-        std::string tmp_BName_C = "./GaiaTesting/bulk/" + p_FName + ".Charge.blk";
-        std::string tmp_BName_R = "./GaiaTesting/bulk/" + p_FName + ".RC.blk";
+        std::string tmp_BName_D = "./GaiaTesting/" + p_FName + "." + std::to_string(p_Tick) + ".Primitive.ssv";
+        std::string tmp_BName_M = "./GaiaTesting/" + p_FName + "." + std::to_string(p_Tick) + ".Match.ssv";
+        std::string tmp_BName_C = "./GaiaTesting/" + p_FName + "." + std::to_string(p_Tick) + ".Charge.ssv";
+        std::string tmp_BName_R = "./GaiaTesting/" + p_FName + "." + std::to_string(p_Tick) + ".RC.ssv";
         BSF_D.open(tmp_BName_D, std::ios::app);
         BSF_M.open(tmp_BName_M, std::ios::app);
         BSF_C.open(tmp_BName_C, std::ios::app);
         BSF_R.open(tmp_BName_R, std::ios::app);
-
-        BSF_D << "\n\n";
-        BSF_M << "\n\n";
-        BSF_C << "\n\n";
-        BSF_R << "\n\n";
 
         if (tmp_Bulk.size() == 0) { BSF_D << "0"; BSF_M << "0"; BSF_C << "0"; BSF_R << "0"; BSF_D.close();  BSF_M.close();  BSF_C.close();  BSF_R.close(); return; }
         if (tmp_Bulk[0].size() == 0) { BSF_D << "0"; BSF_M << "0"; BSF_C << "0"; BSF_R << "0"; BSF_D.close();  BSF_M.close();  BSF_C.close();  BSF_R.close(); return; }
 
         for (int cou_O = 0; cou_O < tmp_Bulk[0][0].size(); cou_O++)
         {
-            BSF_D << "\n" << cou_O << " ";
-            BSF_M << "\n" << cou_O << " ";
-            BSF_C << "\n" << cou_O << " ";
-            BSF_R << "\n" << cou_O << " ";
+            if (cou_O > 0)
+            {
+                BSF_D << "\n";
+                BSF_M << "\n";
+                BSF_C << "\n";
+                BSF_R << "\n";
+            }
+            BSF_D << cou_O << " ";
+            BSF_M << cou_O << " ";
+            BSF_C << cou_O << " ";
+            BSF_R << cou_O << " ";
+
             for (int cou_Raw = 0; cou_Raw < tmp_Bulk[0].size(); cou_Raw++)
             {
                 for (int cou_Chrono = 0; cou_Chrono < tmp_Bulk.size(); cou_Chrono++)
                 {
-                    BSF_D << " " << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Data.D;
-                    BSF_M << " " << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Match.D;
-                    BSF_C << " " << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Charge;
-                    BSF_R << " " << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].RC;
+                    BSF_D << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Data.D << " ";
+                    BSF_M << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Match.D << " ";
+                    BSF_C << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].Charge << " ";
+                    BSF_R << tmp_Bulk[cou_Chrono][cou_Raw][cou_O].RC << " ";
                 }
             }
         }
@@ -428,13 +452,16 @@ public:
         BSF_R.close();
     }
 
-    void evaluate_Traces(std::string p_FName)
+    void evaluate_Traces(std::string p_FName, float p_Score_Threshold_Modifier)
     {
         std::cout << "\n Trace Selection in progress...";
         std::vector<std::vector<std::vector<NT4::s_Out>>> tmp_Bulk;
 
         tmp_Bulk = TSG.get_Bulk(1);
         //write_Bulk(p_FName);
+
+        std::vector<float> tmp_Deviation_Mapping;
+        tmp_Deviation_Mapping = get_Current_Deviation_Set();
 
         // [-----]
         // [--+-+]
@@ -642,7 +669,8 @@ public:
             for (int cou_E = 0; cou_E < IO.Efferent_Count; cou_E++)
             {
                 //Get the Efferent index for the concrete data.
-                int tmp_EIndex = (IO.Efferent_Count * 3) + (cou_E * 3);
+                //int tmp_EIndex = (IO.Afferent_Count * 3) + (cou_E * 3);
+                int tmp_EIndex = (IO.Afferent_Count * 3) + cou_E;
 
                 for (int cou_Chrono = 0; cou_Chrono < (tmp_Chrono_Depth - 1); cou_Chrono++)
                 {
@@ -902,12 +930,17 @@ public:
                             tmp_Output_Signals[cou_E][3] += tmp_Validate_RC_Sum[cou_O];
                             tmp_Output_Signals[cou_E][4] += tmp_Validate_Charge[cou_O];
 
+                            //tmp_Output_Signals[cou_E][4] *= (tmp_Deviation_Mapping[cou_E] * tmp_Deviation_Mapping[cou_E]);
+
+                            //tmp_Output_Signals[cou_E][0] = (tmp_Deviation_Mapping[cou_E] * tmp_Deviation_Mapping[cou_E]);
+
+
                             tmp_Flg_Valid_Trace = true;
                         }
 
                         //tmp_Validate_Signals_Sum[cou_Chrono][cou_E] += tmp_Validate_Signals[cou_Chrono][cou_E][cou_O];
 
-                        opchr(char(tmp_Validate_Signals[cou_Chrono][cou_E][cou_O]));
+                        //opchr(char(tmp_Validate_Signals[cou_Chrono][cou_E][cou_O]));
                     }
                     //---std::cout << "]";
 
@@ -997,23 +1030,24 @@ public:
         }
 
         std::cout << "\n\n\t Valid Traces Found: " << tmp_Valid_Traces;
+        std::cout << "\n\t Almost Valid Traces Found: " << tmp_Almost_Valid_Traces;
 
         std::ofstream tmp_OF;
         std::string tmp_FName = "./GaiaTesting/" + p_FName + ".Valid_Traces.ssv";
         tmp_OF.open(tmp_FName, std::ios::app);
-        tmp_OF << tmp_Valid_Traces << "\n";
+        tmp_OF << Tick_Count << " " << tmp_Valid_Traces << "\n";
         tmp_OF.close();
         
         std::ofstream tmp_AOF;
         tmp_FName = "./GaiaTesting/" + p_FName + ".Nearly_Valid_Traces.ssv";
         tmp_AOF.open(tmp_FName, std::ios::app);
-        tmp_AOF << tmp_Almost_Valid_Traces << "\n";
+        tmp_AOF << Tick_Count << " " << tmp_Almost_Valid_Traces << "\n";
         tmp_AOF.close();
 
         std::ofstream tmp_NOF;
         tmp_FName = "./GaiaTesting/" + p_FName + ".Node_Count.ssv";
         tmp_NOF.open(tmp_FName, std::ios::app);
-        tmp_NOF << TSG.NT4_Core.Base.Nodes.Node_Count << "\n";
+        tmp_NOF << Tick_Count << " " << TSG.NT4_Core.Base.Nodes.Node_Count << "\n";
         tmp_NOF.close();
 
         if ((Previous_Node_Count - TSG.NT4_Core.Base.Nodes.Node_Count) == 0)
@@ -1026,9 +1060,10 @@ public:
         std::ofstream tmp_OTOF;
         tmp_FName = "./GaiaTesting/" + p_FName + ".Total_Output_Traces.ssv";
         tmp_OTOF.open(tmp_FName, std::ios::app);
-        tmp_OTOF << tmp_Output_Depth << "\n";
+        tmp_OTOF << Tick_Count << " " << tmp_Output_Depth << "\n";
         tmp_OTOF.close();
         
+        Tick_Count++;
 
         float tmp_High_Fn = 0;
         for (int cou_E = 0; cou_E < IO.Efferent_Count; cou_E++)
@@ -1060,7 +1095,7 @@ public:
 
         Output_Signals.resize(IO.Efferent_Count);
 
-        tmp_High_Fn *= 0.9;
+        tmp_High_Fn *= p_Score_Threshold_Modifier;
 
         if (tmp_High_Fn == 0) { tmp_High_Fn = 0.1; }
 
@@ -1293,7 +1328,7 @@ public:
     }
 
     //Encodes an input set.
-    void eval(std::string p_FName)
+    void eval(std::string p_FName, float p_Score_Threshold_Modifier)
     {
         //Generate the current trajectory prediction.
         TSG.eval(0);
@@ -1318,7 +1353,7 @@ public:
         //Get the deviation search.
         TSG.eval(1);
 
-        evaluate_Traces(p_FName);
+        evaluate_Traces(p_FName, p_Score_Threshold_Modifier);
 
         /*
         for (int cou_D = 0; cou_D < tmp_Deviation_Set.size(); cou_D++)
@@ -1409,7 +1444,7 @@ public:
         IO.shift_Data();
         TSG.shift_Data();
     }
-    
+
     void set_Afferent_Value(int p_Index, float p_Value, bool p_Con = 1, bool p_Gran = 1, bool p_Delt = 1)
     {
         IO.set_Afferent_Value(p_Index, p_Value);
@@ -1417,8 +1452,8 @@ public:
         //The TSG does straight indexing, so we step by three for con/gran/delta
         int tmp_Index = (p_Index * 3);
 
-        //---if (p_Con) { TSG.set_Input_Index((tmp_Index + 0), IO.Afferent[p_Index]->get_Value_Data_uint64_t()); }
-        /*-*/if (p_Con) { TSG.set_Input_Index(0, (tmp_Index + 0), IO.Afferent[p_Index]->get_Value_Granulated_uint64_t()); }
+        /*-*/if (p_Con) { TSG.set_Input_Index(0, (tmp_Index + 0), IO.Afferent[p_Index]->get_Value_Data_uint64_t()); }
+        //---if (p_Con) { TSG.set_Input_Index(0, (tmp_Index + 0), IO.Afferent[p_Index]->get_Value_Granulated_uint64_t()); }
         if (p_Gran) { TSG.set_Input_Index(0, (tmp_Index + 1), IO.Afferent[p_Index]->get_Value_Granulated_uint64_t()); }
         if (p_Delt) { TSG.set_Input_Index(0, (tmp_Index + 2), IO.Afferent[p_Index]->get_Value_Delta_uint64_t()); }
 
@@ -1433,13 +1468,14 @@ public:
         IO.set_Efferent_Value(p_Index, p_Value);
 
         //The TSG does straight indexing, so we step by three for con/gran/delta
-        int tmp_Index = ((IO.Afferent_Count) * 3) + (p_Index * 3);
+        int tmp_Index = ((IO.Afferent_Count) * 3) + p_Index;
 
         //---std::cout << "\n set_Efferent_Value(" << p_Index << ", " << p_Value << "): tmp_Index: " << tmp_Index;
 
         TSG.set_Input_Index(0, (tmp_Index + 0), IO.Efferent[p_Index]->get_Value_Data_uint64_t());
-        TSG.set_Input_Index(0, (tmp_Index + 1), IO.Efferent[p_Index]->get_Value_Granulated_uint64_t());
-        TSG.set_Input_Index(0, (tmp_Index + 2), IO.Efferent[p_Index]->get_Value_Delta_uint64_t());
+        //---TSG.set_Input_Index(0, (tmp_Index + 1), IO.Efferent[p_Index]->get_Value_Data_uint64_t());
+        //---TSG.set_Input_Index(0, (tmp_Index + 1), IO.Efferent[p_Index]->get_Value_Granulated_uint64_t());
+        //---TSG.set_Input_Index(0, (tmp_Index + 2), IO.Efferent[p_Index]->get_Value_Delta_uint64_t());
     }
 
     void output_Deviation_Mapping()
@@ -1450,6 +1486,10 @@ public:
     std::vector<float> get_Current_Deviation_Set()
     {
         return IO.get_Current_Deviation_Set();
+    }
+    std::vector<std::vector<float>> get_Deviation_Set()
+    {
+        return IO.get_Deviation_Set();
     }
 
     void copy_Deviation(int p_RF)
@@ -1547,41 +1587,34 @@ public:
 
 
 
-void setup_Map(c_Map_Sim * p_Map)
+void setup_Map(c_Map_Sim * p_Map, int p_A_Depth, int p_E_Depth)
 {
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
-    p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
+    for (int cou_S = 0; cou_S < p_A_Depth; cou_S++)
+    {
+        p_Map->add_Sensor((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()));
+    }
 
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 75);// (rand() % 250));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 70));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 500));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 70));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 500));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 70));
-    p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 500));
+    bool flg_Flip = false;
 
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 10);
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 500);
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 10);
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 500);
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 10);
-    //p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), 500);
+    for (int cou_A = 0; cou_A < p_E_Depth; cou_A++)
+    {
+        if (flg_Flip == false)
+        {
+            p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 70));
+        }
 
-    p_Map->turn_Actuator_On(0);
-    p_Map->turn_Actuator_On(1);
-    p_Map->turn_Actuator_On(2);
-    p_Map->turn_Actuator_On(3);
-    p_Map->turn_Actuator_On(4);
-    p_Map->turn_Actuator_On(5);
+        if (flg_Flip == true)
+        {
+            p_Map->add_Actuator((rand() % p_Map->get_Width()), (rand() % p_Map->get_Height()), (rand() % 500));
+        }
+
+        flg_Flip = !flg_Flip;
+    }
 }
 
-void setup_Gaia(c_Homeostasis_Module * p_ProtoGaia, int p_Chrono_Depth, int p_IO_Depth)
+void setup_Gaia(c_Homeostasis_Module * p_ProtoGaia, int p_Chrono_Depth, int p_A_Depth, int p_E_Depth)
 {
-    for (int cou_IO = 0; cou_IO < p_IO_Depth; cou_IO++)
+    for (int cou_IO = 0; cou_IO < p_A_Depth; cou_IO++)
     {
         /*-*/std::cout << "\n <A[" << cou_IO << "]> " << p_ProtoGaia->register_Afferent();
 
@@ -1592,7 +1625,7 @@ void setup_Gaia(c_Homeostasis_Module * p_ProtoGaia, int p_Chrono_Depth, int p_IO
         p_ProtoGaia->add_Afferent_Granulation(0, 120, cou_IO);
         p_ProtoGaia->add_Afferent_Granulation(-500, 500, cou_IO);
     }
-    for (int cou_IO = 0; cou_IO < p_IO_Depth; cou_IO++)
+    for (int cou_IO = 0; cou_IO < p_E_Depth; cou_IO++)
     {
         /*-*/std::cout << "\n <E[" << cou_IO << "]> " << p_ProtoGaia->register_Efferent();
     }
@@ -1661,26 +1694,61 @@ float calc_Mean_Squared_Error(float p_Prediction, float p_Actual)
 
 void gather_ProtoGaia_Input(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map)
 {
-    p_ProtoGaia->set_Afferent_Value(0, p_Map->get_Sensor_Data(0));
-    p_ProtoGaia->set_Afferent_Value(1, p_Map->get_Sensor_Data(1));
-    p_ProtoGaia->set_Afferent_Value(2, p_Map->get_Sensor_Data(2));
-    p_ProtoGaia->set_Afferent_Value(3, p_Map->get_Sensor_Data(3));
-    p_ProtoGaia->set_Afferent_Value(4, p_Map->get_Sensor_Data(4));
-    p_ProtoGaia->set_Afferent_Value(5, p_Map->get_Sensor_Data(5));
+    for (int cou_S = 0; cou_S < p_Map->get_Sensor_Count(); cou_S++)
+    {
+        p_ProtoGaia->set_Afferent_Value(cou_S, p_Map->get_Sensor_Data(cou_S));
+    }
 
-    p_ProtoGaia->set_Efferent_Value(0, p_Map->get_Actuator_State(0));
-    p_ProtoGaia->set_Efferent_Value(1, p_Map->get_Actuator_State(1));
-    p_ProtoGaia->set_Efferent_Value(2, p_Map->get_Actuator_State(2));
-    p_ProtoGaia->set_Efferent_Value(3, p_Map->get_Actuator_State(3));
-    p_ProtoGaia->set_Efferent_Value(4, p_Map->get_Actuator_State(4));
-    p_ProtoGaia->set_Efferent_Value(5, p_Map->get_Actuator_State(5));
+    for (int cou_A = 0; cou_A < p_Map->get_Actuator_Count(); cou_A++)
+    {
+        p_ProtoGaia->set_Efferent_Value(cou_A, p_Map->get_Actuator_State(cou_A));
+    }
 }
 
+void write_ProtoGaia_Input(c_Map_Sim* p_Map, std::string p_FName)
+{
+
+    std::ofstream SF;
+    SF.open(p_FName, std::ios::app);
+    SF << p_Map->get_Tick() << " ";
+    for (int cou_I = 0; cou_I < p_Map->get_Sensor_Count(); cou_I++)
+    {
+        SF << p_Map->get_Sensor_Data(cou_I) << " ";
+    }
+    SF << "    ";
+    for (int cou_I = 0; cou_I < p_Map->get_Actuator_Count(); cou_I++)
+    {
+        SF << p_Map->get_Actuator_State(cou_I) << " ";
+    }
+    SF << "\n";
+    SF.close();
+}
+
+void write_ProtoGaia_Deviation_Mapping(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, std::string p_FName)
+{
+    std::ofstream SF;
+    SF.open(p_FName, std::ios::app);
+    
+    SF << p_Map->get_Tick() << " ";
+
+    std::vector<std::vector<float>> tmp_DMap;
+    tmp_DMap = p_ProtoGaia->get_Deviation_Set();
+
+    for (int cou_A = 0; cou_A < tmp_DMap.size(); cou_A++)
+    {
+        for (int cou_D = 0; cou_D < tmp_DMap[cou_A].size(); cou_D++)
+        {
+            SF << " " << tmp_DMap[cou_A][cou_D];
+        }
+    }
+    SF << "\n";
+    SF.close();
+}
 
 
 void fill_Chrono(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_Count)
 {
-    for (int cou_Actuator = 0; cou_Actuator < 6; cou_Actuator++)
+    for (int cou_Actuator = 0; cou_Actuator < p_Map->get_Actuator_Count(); cou_Actuator++)
     {
         p_Map->turn_Actuator_Off(cou_Actuator);
     }
@@ -1706,7 +1774,7 @@ void train_Actuators(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_
 {
     fill_Chrono(p_ProtoGaia, p_Map, p_Step_Count);
 
-    for (int cou_Actuator = 0; cou_Actuator < 6; cou_Actuator++)
+    for (int cou_Actuator = 0; cou_Actuator < p_ProtoGaia->IO.Efferent_Count; cou_Actuator++)
     {
 
         p_Map->set_Map_Temp(0.0);
@@ -1725,7 +1793,7 @@ void train_Actuators(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_
                 std::cout << char(8);
             }
 
-            std::cout << " Training Actuator[" << cou_Actuator << "] / 6 ";
+            std::cout << " Training Actuator[" << cou_Actuator << "] / " << p_ProtoGaia->IO.Efferent_Count << " ";
             std::cout << " 0 Degrees ";
             std::cout << " ......Training Step [" << cou_Index << " / " << p_Train_Depth << "]...";
 
@@ -1753,7 +1821,7 @@ void train_Actuators(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_
             {
                 std::cout << char(8);
             }
-            std::cout << " Training Actuator[" << cou_Actuator << "] / 6 ";
+            std::cout << " Training Actuator[" << cou_Actuator << "] / " << p_ProtoGaia->IO.Efferent_Count << " ";
             std::cout << " 250 Degrees ";
             std::cout << " ......Training Step [" << cou_Index << " / " << p_Train_Depth << "]...";
 
@@ -1800,12 +1868,12 @@ void random_Training(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_
 
         if (!(p_Train_Count % 10))
         {
-            for (int cou_R = 0; cou_R < 6; cou_R++)
+            for (int cou_R = 0; cou_R < p_ProtoGaia->IO.Efferent_Count; cou_R++)
             {
                 p_Map->turn_Actuator_Off(cou_R);
             }
-            p_Map->turn_Actuator_On(rand() % 6);
-            p_Map->turn_Actuator_On(rand() % 6);
+            p_Map->turn_Actuator_On(rand() % p_ProtoGaia->IO.Efferent_Count);
+            p_Map->turn_Actuator_On(rand() % p_ProtoGaia->IO.Efferent_Count);
         }
 
 
@@ -1852,7 +1920,7 @@ void null_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
 
 
 
-        for (int cou_R = 0; cou_R < 6; cou_R++)
+        for (int cou_R = 0; cou_R < p_ProtoGaia->IO.Efferent_Count; cou_R++)
         {
             if (!(rand() % 25))
             {
@@ -1864,7 +1932,7 @@ void null_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
                 {
                     p_Map->turn_Actuator_Off(cou_R);
                 }
-                cou_R = 6;
+                cou_R = p_ProtoGaia->IO.Efferent_Count;
             }
         }
 
@@ -1960,6 +2028,96 @@ void null_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
     }
 }
 
+void record_Prediction_Resutls(c_Historical_DB * p_Proj_DB, c_Historical_DB * p_Hist_DB, int p_Tick, c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, std::string p_FName = "")
+{
+
+    p_Proj_DB->add_To_Hist(p_ProtoGaia->get_Current_Projection(0));
+
+    /*-*/std::cout << "\n\n Projection History";
+    /*-*/p_Proj_DB->output_DB();
+
+    p_Hist_DB->add_To_Hist(p_ProtoGaia->TSG.RF[0].Input);
+    /*-*/std::cout << "\n\n Ground Truth History";
+    /*-*/p_Hist_DB->output_DB();
+
+    //So we have to take the prediction from Chrono_Depth steps ago. This will be compared to the entry for the current.
+
+    float tmp_Current_MSE = 0.0;
+    float tmp_Current_MSE_Count = 0.0;
+
+    float tmp_MSE_Total = 0.0;
+    float tmp_MSE_Total_Count = 0.0;
+
+
+    std::vector<u_Data> tmp_Prediction;
+    std::vector<u_Data> tmp_Truth;
+
+    std::vector<float> tmp_Current_MSE_Raw;
+    std::vector<float> tmp_Current_MSE_Raw_Count;
+
+    tmp_Current_MSE_Raw.clear();
+    tmp_Current_MSE_Raw_Count.clear();
+
+    float tmp_D_MSE_Total = 0.0;
+    float tmp_D_MSE_Total_Count = 0.0;
+	
+	std::system("dir");
+	
+    if (p_Tick >= p_Hist_DB->get_Chrono_Depth())
+    {
+        std::string tmp_FName = "./GaiaTesting/prediction_hypo." + p_FName + ".ssv";
+        std::ofstream pred_File(tmp_FName, std::ios::ate);
+		std::cout << "\n File [" << tmp_FName << "] open state [" << pred_File.is_open() << "]";
+        tmp_Current_MSE = 0.0;
+        tmp_Current_MSE_Count = 0.0;
+
+        //---std::cout << "\n Hist: ";
+        for (int cou_Raw = 0; cou_Raw < p_ProtoGaia->TSG.Raw_Depth; cou_Raw++)
+        {
+            tmp_Current_MSE_Raw.resize(p_ProtoGaia->TSG.Raw_Depth);
+            tmp_Current_MSE_Raw_Count.resize(p_ProtoGaia->TSG.Raw_Depth);
+
+            tmp_Current_MSE_Raw.clear();
+            tmp_Current_MSE_Raw_Count.clear();
+
+            tmp_Prediction = p_Proj_DB->get_Entry((p_Tick - p_Hist_DB->get_Chrono_Depth()), cou_Raw);
+            tmp_Truth = p_Hist_DB->get_Entry(p_Tick, cou_Raw);
+            //---std::cout << "\n -=- [" << cou_Raw << "]: ";
+            for (int cou_A = 0; cou_A < tmp_Prediction.size(); cou_A++)
+            {
+                //---std::cout << " <" << tmp_Prediction[cou_A].D << " _ ";
+                //---std::cout << tmp_Truth[cou_A].D << " _ ";
+                //---std::cout << calc_Mean_Squared_Error(tmp_Prediction[cou_A].D, tmp_Truth[cou_A].D) << "> ";
+                tmp_Current_MSE += calc_Mean_Squared_Error(tmp_Prediction[cou_A].D, tmp_Truth[cou_A].D);
+                tmp_MSE_Total += calc_Mean_Squared_Error(tmp_Prediction[cou_A].D, tmp_Truth[cou_A].D);
+                //tmp_Current_MSE_Raw += calc_Mean_Squared_Error(tmp_Prediction[cou_A].D, tmp_Truth[cou_A].D);
+                tmp_MSE_Total_Count++;
+                tmp_Current_MSE_Count++;
+                //tmp_Current_MSE_Raw_Count++;
+
+                /*
+                pred_File << calc_Mean_Squared_Error(tmp_Prediction[cou_A].D, tmp_Truth[cou_A].D);
+
+                if (cou_A < (tmp_Prediction.size() - 1))
+                {
+                    pred_File << " ";
+                }
+                */
+            }
+        }
+
+        //pred_File << "\n";
+        pred_File << (tmp_Current_MSE / tmp_Current_MSE_Count) << "\n";
+        pred_File.close();
+    }
+	else
+	{
+		std::cout << "\n Database not full enough to save yet [" << p_Tick << " / " << p_Hist_DB->get_Chrono_Depth() << "]";
+	}
+			
+		
+}
+
 void pred_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_Count, int p_Train_Count, int p_Seed, std::string p_FName = "")
 {
     fill_Chrono(p_ProtoGaia, p_Map, p_Step_Count);
@@ -1976,8 +2134,8 @@ void pred_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
     float tmp_MSE_Total_Count = 0.0;
 
     std::string tmp_FName = "./GaiaTesting/prediction_hypo." + p_FName + ".ssv";
-    std::ofstream predd_File(tmp_FName, std::ios::trunc);
-    predd_File.close();
+    std::ofstream prediction_File(tmp_FName, std::ios::trunc);
+    prediction_File.close();
 
     std::cout << "\n\n Gathering Predictive Hypothosis Set:\n";
     srand(p_Seed);
@@ -1993,7 +2151,7 @@ void pred_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
 
         gather_ProtoGaia_Input(p_ProtoGaia, p_Map);
 
-        for (int cou_R = 0; cou_R < 6; cou_R++)
+        for (int cou_R = 0; cou_R < p_ProtoGaia->IO.Afferent_Count; cou_R++)
         {
             if (!(rand() % 25))
             {
@@ -2005,11 +2163,11 @@ void pred_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
                 {
                     p_Map->turn_Actuator_Off(cou_R);
                 }
-                cou_R = 6;
+                cou_R = p_ProtoGaia->IO.Afferent_Count;
             }
         }
 
-        p_ProtoGaia->eval(p_FName);
+        p_ProtoGaia->eval(p_FName, 0.9);
 
         Projection_DB.add_To_Hist(p_ProtoGaia->get_Current_Projection(0));
 
@@ -2093,6 +2251,7 @@ void pred_Hypo(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_C
 
 }
 
+
 void generate_NULL_Hypo_Gaia(c_Map_Sim* p_Map, int p_Step_Count, int p_Random_Seed, int p_Test_Depth, std::string p_FName)
 {
     std::cout << "\n\n NULL GEN:\n";
@@ -2156,9 +2315,30 @@ void generate_NULL_Hypo_Gaia(c_Map_Sim* p_Map, int p_Step_Count, int p_Random_Se
     }
 }
 
-void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_Count, int p_Random_Seed, int p_Test_Depth, std::string p_FName, bool p_Output_Bulk)
+
+void init_DB(c_Historical_DB* p_Proj_DB, c_Historical_DB* p_Hist_DB, c_Homeostasis_Module * p_ProtoGaia, std::string p_FName)
 {
 
+    p_Proj_DB->set_Chrono_Depth(p_ProtoGaia->get_Chrono_Depth());
+    p_Proj_DB->set_Raw_Depth(p_ProtoGaia->TSG.Raw_Depth);
+    p_Hist_DB->set_Chrono_Depth(p_ProtoGaia->get_Chrono_Depth());
+    p_Hist_DB->set_Raw_Depth(p_ProtoGaia->TSG.Raw_Depth);
+
+    std::string tmp_FName = "./GaiaTesting/prediction_hypo." + p_FName + ".ssv";
+    std::ofstream prediction_File(tmp_FName, std::ios::trunc);
+    prediction_File.close();
+}
+
+void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step_Count, int p_Random_Seed, int p_Test_Depth, std::string p_FName, bool p_Output_Bulk, float p_Score_Threshold_Modifier)
+{
+    c_Historical_DB Projection_DB;
+    c_Historical_DB Hist_DB;
+
+    init_DB(&Projection_DB, &Hist_DB, p_ProtoGaia, p_FName);
+
+    std::string tmp_FName_Root = "./GaiaTesting/";
+    std::string tmp_SFName = tmp_FName_Root + p_FName + ".input.ssv";
+    std::string tmp_SF_DMap_Name = tmp_FName_Root + p_FName + ".dmap.ssv";
 
     std::cout << "\n\n Manual OVERRIDE ENGAGED HYAWW:\n";
     
@@ -2167,12 +2347,30 @@ void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step
     std::cout << " Step_Count: " << p_Step_Count << " Seed: " << p_Random_Seed;
     srand(p_Random_Seed);
 
-    p_Map->set_Map_Temp(25);
+    p_Map->set_Map_Temp(0);
+
+    p_Map->reset_Tick();
+
+    for (int cou_Agent = 0; cou_Agent < p_Map->get_Agent_Count(); cou_Agent++)
+    {
+        p_Map->set_Agent_XY(cou_Agent, (1 + (rand() % (p_Map->get_Width() - 2))), (1 + (rand() % (p_Map->get_Height() - 2))));
+        p_Map->set_Agent_HP(cou_Agent, 100);
+    }
 
     for (int cou_E = 0; cou_E < p_ProtoGaia->IO.Efferent_Count; cou_E++)
     {
         p_ProtoGaia->set_Efferent_Value(cou_E, -1);
     }
+
+    for (int cou_S = 0; cou_S < p_ProtoGaia->TSG.Chrono_Depth; cou_S++)
+    {
+        p_ProtoGaia->TSG.shift_Data(0);
+        p_ProtoGaia->TSG.shift_Data(1);
+    }
+
+    int Day_Night_Cycle_Length = 50;
+    int Day_Night_Current = 0;
+    bool Day_Night = 1;
 
     for (int cou_Index = 0; cou_Index < p_Test_Depth; cou_Index++)
     {
@@ -2181,34 +2379,64 @@ void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step
 
         for (int cou_N = 0; cou_N < p_Step_Count; cou_N++)
         {
+
+            std::string tmp_Map_Temps_Name = tmp_FName_Root + p_FName + ".temp";
+            p_Map->write_Map_Temps(tmp_Map_Temps_Name);
+
+            std::string tmp_Map_MSE_Name = tmp_FName_Root + p_FName + ".MSE";
+            p_Map->write_Map_MSE(tmp_Map_MSE_Name);
+
+            std::string tmp_Map_Map_Name = tmp_FName_Root + p_FName + ".map";
+            p_Map->write_Map_Tiles(tmp_Map_Map_Name);
+            /*
+            if (Day_Night == 0)
+            {
+                p_Map->chill_Map(0.5);
+                std::cout << "\n Night..";
+            }
+
+            if (Day_Night == 1)
+            {
+                std::cout << "\n Day..";
+                p_Map->chill_Map(-0.5);
+            }
+
+            Day_Night_Current++;
+
+            if (Day_Night_Current >= Day_Night_Cycle_Length)
+            {
+                Day_Night = !Day_Night;
+                Day_Night_Current = 0;
+            }
+            */
             p_Map->update();
+
+            //p_Map->output_Agents();
         }
         /*-*/p_Map->view_Map();
-
+        std::cout << "\n Tick: " << p_Map->get_Tick();
         //std::cout << "\n Rand " << tmp_Ran_Streak << " / " << tmp_Ran_Streak_Depth << " Temp: " << tmp_Ran_Temp << " @ (" << tmp_Ran_X << ", " << tmp_Ran_Y << ")";
 
         p_ProtoGaia->shift_Data();
 
         gather_ProtoGaia_Input(p_ProtoGaia, p_Map);
 
-        /*
-        p_ProtoGaia->set_Afferent_Value(0, (rand() % 200));
-        p_ProtoGaia->set_Afferent_Value(1, (rand() % 200));
-        p_ProtoGaia->set_Afferent_Value(2, (rand() % 200));
-        p_ProtoGaia->set_Afferent_Value(3, (rand() % 200));
-        p_ProtoGaia->set_Afferent_Value(4, (rand() % 200));
-        p_ProtoGaia->set_Afferent_Value(5, (rand() % 200));
-        */
-        
-        p_ProtoGaia->eval(p_FName);
+        write_ProtoGaia_Input(p_Map, tmp_SFName);
+
+        p_ProtoGaia->eval(p_FName, p_Score_Threshold_Modifier);
+
+        record_Prediction_Resutls(&Hist_DB, &Projection_DB, cou_Index, p_ProtoGaia, p_Map, p_FName);
 
         if (p_Output_Bulk == 1)
         {
-            p_ProtoGaia->write_Bulk(p_FName);
+            p_ProtoGaia->write_Bulk(p_FName, p_Map->get_Tick());
         }
 
+        write_ProtoGaia_Deviation_Mapping(p_ProtoGaia, p_Map, tmp_SF_DMap_Name);
+
+        //Takes signals from Gaia and copies them over to the exterior system, turns things on and off.
         int tmp_ONOFF = 0;
-        for (int cou_R = 0; cou_R < 6; cou_R++)
+        for (int cou_R = 0; cou_R < p_ProtoGaia->IO.Efferent_Count; cou_R++)
         {
             tmp_ONOFF = 0;
             //std::cout << "\n Enter A[" << cou_R << "] 1/0:";
@@ -2216,8 +2444,6 @@ void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step
 
             tmp_ONOFF = p_ProtoGaia->get_Output_Signals(cou_R);
             //std::cout << "\n A[" << cou_R << "]: " << tmp_ONOFF;
-
-            
 
             if (tmp_ONOFF > 0)
             {
@@ -2227,68 +2453,28 @@ void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step
             {
                 p_Map->turn_Actuator_Off(cou_R);
             }
-            /*
-            if (!(rand() % 10))
-            {
-                if (!(rand() % 2))
-                {
-                    p_Map->turn_Actuator_On(cou_R);
-                }
-                else
-                {
-                    p_Map->turn_Actuator_Off(cou_R);
-                }
-                cou_R = 6;
-            }
-            */
         }
 
-        std::string tmp_FName_Root = "./GaiaTesting/";
 
         for (int cou_E = 0; cou_E < p_ProtoGaia->IO.Efferent_Count; cou_E++)
         {
             std::ofstream SSF;
-            std::string tmp_SSFName = tmp_FName_Root + "signals/" + p_FName + ".sig." + std::to_string(cou_E) + "." + std::to_string(p_Map->get_Actuator_Temp(cou_E)) + ".ssv";
+            std::string tmp_SSFName = tmp_FName_Root + p_FName + ".sig." + std::to_string(cou_E) + "." + std::to_string(p_Map->get_Actuator_Temp(cou_E)) + ".ssv";
             SSF.open(tmp_SSFName, std::ios::app);
 
             if (p_ProtoGaia->get_Output_Signals(cou_E) == 1)
             {
-                SSF << p_Map->get_Actuator_Temp(cou_E) << "\n";
+                SSF << p_Map->get_Tick() << " " << p_Map->get_Actuator_Temp(cou_E) << "\n";
             }
             else
             {
-                SSF << "0\n";
+                SSF << p_Map->get_Tick() << "0\n";
             }
 
             SSF.close();
         }
 
-        std::string tmp_Map_Temps_Name = tmp_FName_Root + "temps/" + p_FName + ".temp";
-        p_Map->write_Map_Temps(tmp_Map_Temps_Name);
-
-        std::string tmp_Map_MSE_Name = tmp_FName_Root + "mse/" + p_FName + ".MSE";
-        p_Map->write_Map_MSE(tmp_Map_MSE_Name);
-
-        std::string tmp_Map_Map_Name = tmp_FName_Root + p_FName + ".map";
-        p_Map->write_Map_Tiles(tmp_Map_Map_Name);
-
         p_ProtoGaia->encode();
-
-        /*
-        for (int cou_R = 0; cou_R < tmp_Prediction.size(); cou_R++)
-        {
-            std::cout << "\n cou_R[" << cou_R << "]";
-
-            for (int cou_I = 0; cou_I < tmp_Prediction[cou_R].size(); cou_I++)
-            {
-                std::cout << " (" << tmp_Prediction[cou_R][cou_I].D << "_";
-
-                if (tmp_Prediction[cou_R][cou_I].D > 0) { std::cout << "(-1)"; }
-                if (tmp_Prediction[cou_R][cou_I].D == 0) { std::cout << "(0)"; }
-                if (tmp_Prediction[cou_R][cou_I].D < 0) { std::cout << "(+1)"; }
-                std::cout << ")";
-            }
-        }*/
     }
 
 }
@@ -2299,26 +2485,307 @@ void manual_Mode(c_Homeostasis_Module* p_ProtoGaia, c_Map_Sim* p_Map, int p_Step
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+int run_Gaia(int argc, char ** argv)
+{
+    if (argc < 6)
+    {
+        std::cout << "\nUsage: " << argv[0];
+        std::cout << "\n <Experiment_Name (string)>";
+        std::cout << "\n <Chrono_Depth(int)> ";
+        std::cout << "\n <Step_Count(int)> ";
+        std::cout << "\n <Actuator_Train_Depth(int)> ";
+        std::cout << "\n <Random_Train_Depth(int)> ";
+        std::cout << "\n <random_Run_Seed(int)> ";
+        std::cout << "\n <random_Training_Seed(int)>";
+        std::cout << "\n <P Action_Potential_Threshold_MSC (float)>";
+        std::cout << "\n <P Modifier_Charge_MSC (float)>";
+        std::cout << "\n <P Action_Potential_Threshold_Chrono (float)>";
+        std::cout << "\n <P Modifier_Charge_Chrono (float)>";
+        std::cout << "\n <D Action_Potential_Threshold_MSC (float)>";
+        std::cout << "\n <D Modifier_Charge_MSC (float)>";
+        std::cout << "\n <D Action_Potential_Threshold_Chrono (float)>";
+        std::cout << "\n <D Modifier_Charge_Chrono (float)>";
+        std::cout << "\n <output_Bulk (bool)>";
+        std::cout << "\n <Sensor_Count (int)>";
+        std::cout << "\n <Actuator_Count (int)>";
+        std::cout << "\n <Score_Threshold_Modifier (float)>";
+        std::cout << "\n <Map_Width (int)>";
+        std::cout << "\n <Map_Height (int)>";
+        return 0;
+    }
+
+    std::string EName = argv[1];
+    std::cout << "\n Experiment_Name (string): " << EName;
+
+    int Chrono_Depth = std::atoi(argv[2]);
+    std::cout << "\n Chrono_Depth (int): " << Chrono_Depth;
+
+    int Step_Count = std::atoi(argv[3]);
+    std::cout << "\n Step_Count (int): " << Step_Count;
+
+    int tmp_Train_Depth = std::atoi(argv[4]);
+    std::cout << "\n tmp_Actuator_Train_Depth (int): " << tmp_Train_Depth;
+
+    int tmp_RanMax = std::atoi(argv[5]);
+    std::cout << "\n tmp_Random_Train_Depth (int): " << tmp_RanMax;
+
+    int random_Seed_Base = std::atoi(argv[6]);
+    int random_Seed = random_Seed_Base;
+    std::cout << "\nrandom_Run_Seed (int): " << random_Seed_Base;
+
+    int random_Training_Seed_Base = std::atoi(argv[7]);
+    std::cout << "\nrandom_Training_Seed (int): " << random_Training_Seed_Base;
+
+    //The hyperparamters.
+    float hyper_Param_Prediction_Action_Potential_Threshold_MSC = std::atof(argv[8]);
+    std::cout << "\n Enter Prediction Action_Potential_Threshold_MSC (float): " << hyper_Param_Prediction_Action_Potential_Threshold_MSC;
+
+    float hyper_Param_Prediction_Modifier_Charge_MSC = std::atof(argv[9]);
+    std::cout << "\n Enter Prediction_Modifier_Charge_MSC: " << hyper_Param_Prediction_Modifier_Charge_MSC;
+
+    float hyper_Param_Prediction_Action_Potential_Threshold_Chrono = std::atof(argv[10]);
+    std::cout << "\n Enter Prediction_Action_Potential_Threshold_Chrono: " << hyper_Param_Prediction_Action_Potential_Threshold_Chrono;
+
+    float hyper_Param_Prediction_Modifier_Charge_Chrono = std::atof(argv[11]);
+    std::cout << "\n Enter Prediction_Modifier_Charge_Chrono: " << hyper_Param_Prediction_Modifier_Charge_Chrono;
+
+
+
+       
+    float hyper_Param_Deviation_Action_Potential_Threshold_MSC = std::atof(argv[12]);
+    std::cout << "\n Enter Deviation hyper_Param_Deviation_Action_Potential_Threshold_MSC (float): " << hyper_Param_Deviation_Action_Potential_Threshold_MSC;
+
+    float hyper_Param_Deviation_Modifier_Charge_MSC = std::atof(argv[13]);
+    std::cout << "\n Enter Deviation hyper_Param_Deviation_Modifier_Charge_MSC (float): " << hyper_Param_Deviation_Modifier_Charge_MSC;
+
+    float hyper_Param_Deviation_Action_Potential_Threshold_Chrono = std::atof(argv[14]);
+    std::cout << "\n Enter Deviation hyper_Param_Deviation_Action_Potential_Threshold_Chrono (float): " << hyper_Param_Deviation_Action_Potential_Threshold_Chrono;
+
+    float hyper_Param_Deviation_Modifier_Charge_Chrono = std::atof(argv[15]);
+    std::cout << "\n Enter Deviation hyper_Param_Deviation_Modifier_Charge_Chrono (float): " << hyper_Param_Deviation_Modifier_Charge_Chrono;
+
+
+    bool output_Bulk = std::atoi(argv[16]);
+    std::cout << "\n Enter output_Bulk [0 | 1]: " << output_Bulk;
+
+    int Sensor_Count = std::atoi(argv[17]);
+    std::cout << "\n Enter Sensor_Count (int): " << Sensor_Count;
+
+    int Actuator_Count = std::atoi(argv[18]);
+    std::cout << "\n Enter Actuator_Count (int): " << Actuator_Count;
+
+    float  Score_Threshold_Modifier = std::atof(argv[19]);
+    std::cout << "\n Enter Score_Threshold_Modifier (float): " << Score_Threshold_Modifier;
+
+    int Map_Width = std::atoi(argv[20]);
+    std::cout << "\n Enter Map_Width (int): " << Map_Width;
+
+    int Map_Height = std::atoi(argv[21]);
+    std::cout << "\n Enter Map_Height (int): " << Map_Height;
+
+    int Test_Depth = std::atoi(argv[22]);
+    std::cout << "\n Enter Test_Depth (int): " << Test_Depth;
+
+    std::string tmp_EName_Full = "./GaiaTesting/" + EName + ".cfg";
+
+    std::ofstream NSF;
+    NSF.open(tmp_EName_Full, std::ios::trunc);
+
+    NSF << "Chrono_Depth (int): ";
+    NSF << Chrono_Depth;
+
+    NSF << "\nStep_Count (int): ";
+    NSF << Step_Count;
+
+    NSF << "\nActuator_Train_Depth (int): ";
+    NSF << tmp_Train_Depth;
+
+    NSF << "\nRandom_Train_Depth (int): ";
+    NSF << tmp_RanMax;
+
+    /*
+    NSF << "\n # null sets to gen (int): ";
+    NSF << tmp_Null_Run_Count;
+
+    NSF << "\n # prediction sets to gen (int): ";
+    NSF << tmp_Pred_Run_Count;
+
+    NSF << "\n depth of null sets to gen (int): ";
+    NSF << tmp_Stat_Count;
+
+    NSF << "\n depth of prediction sets to gen (int): ";
+    NSF << tmp_Test_Count;
+    */
+
+
+    NSF << "\nrandom_Run_Seed (int): ";
+    NSF << random_Seed_Base;
+
+    NSF << "\nrandom_Training_Seed (int): ";
+    NSF << random_Training_Seed_Base;
+
+    NSF << "\nhyper_Param_Prediction_Action_Potential_Threshold_MSC (float): ";
+    NSF << hyper_Param_Prediction_Action_Potential_Threshold_MSC;
+
+    NSF << "\nhyper_Param_Prediction_Modifier_Charge_MSC (float): ";
+    NSF << hyper_Param_Prediction_Modifier_Charge_MSC;
+
+    NSF << "\nhyper_Param_Prediction_Action_Potential_Threshold_Chrono (float): ";
+    NSF << hyper_Param_Prediction_Action_Potential_Threshold_Chrono;
+
+    NSF << "\nhyper_Param_Prediction_Modifier_Charge_Chrono (float): ";
+    NSF << hyper_Param_Prediction_Modifier_Charge_Chrono;
+
+    NSF << "\nhyper_Param_Deviation_Action_Potential_Threshold_MSC (float): ";
+    NSF << hyper_Param_Deviation_Action_Potential_Threshold_MSC;
+
+    NSF << "\nhyper_Param_Deviation_Modifier_Charge_MSC (float): ";
+    NSF << hyper_Param_Deviation_Modifier_Charge_MSC;
+
+    NSF << "\nhyper_Param_Deviation_Action_Potential_Threshold_Chrono (float): ";
+    NSF << hyper_Param_Deviation_Action_Potential_Threshold_Chrono;
+
+    NSF << "\nhyper_Param_Deviation_Modifier_Charge_Chrono (float): ";
+    NSF << hyper_Param_Deviation_Modifier_Charge_Chrono;
+
+    NSF << "\noutput_Bulk (bool): ";
+    NSF << output_Bulk;
+
+    NSF << "\nsensor_Count (int): ";
+    NSF << Sensor_Count;
+
+    NSF << "\nactuator_Count (int): ";
+    NSF << Actuator_Count;
+
+    NSF << "\nScore_Threshold_Modifier (float): ";
+    NSF << Score_Threshold_Modifier;
+
+    NSF << "\nMap_Width (int): ";
+    NSF << Map_Width;
+
+    NSF << "\nMap_Height (int): ";
+    NSF << Map_Height;
+
+
+    NSF << "\nTest_Depth (int): ";
+    NSF << Test_Depth;
+	
+    NSF.close();
+    srand(random_Seed);
+
+    //c_Map_Sim Map(25, 25);
+    c_Map_Sim Map(Map_Width, Map_Height);
+    c_Homeostasis_Module ProtoGaia;
+
+    setup_Map(&Map, Sensor_Count, Actuator_Count);
+    setup_Gaia(&ProtoGaia, Chrono_Depth, Sensor_Count, Actuator_Count);
+    //Map.init_Agents(250);
+    //Map.output_Agents();
+
+    ProtoGaia.TSG.set_Chrono_APT(0, hyper_Param_Prediction_Action_Potential_Threshold_Chrono);
+    ProtoGaia.TSG.set_MSC_APT(0, hyper_Param_Prediction_Action_Potential_Threshold_MSC);
+    ProtoGaia.TSG.set_Chrono_MC(0, hyper_Param_Prediction_Modifier_Charge_Chrono);
+    ProtoGaia.TSG.set_MSC_MC(0, hyper_Param_Prediction_Modifier_Charge_MSC);
+
+    ProtoGaia.TSG.set_Chrono_APT(1, hyper_Param_Deviation_Action_Potential_Threshold_Chrono);
+    ProtoGaia.TSG.set_MSC_APT(1, hyper_Param_Deviation_Action_Potential_Threshold_MSC);
+    ProtoGaia.TSG.set_Chrono_MC(1, hyper_Param_Deviation_Modifier_Charge_Chrono);
+    ProtoGaia.TSG.set_MSC_MC(1, hyper_Param_Deviation_Modifier_Charge_MSC);
+
+    srand(random_Training_Seed_Base);
+    train_Actuators(&ProtoGaia, &Map, Step_Count, tmp_Train_Depth);
+    srand(random_Training_Seed_Base);
+    random_Training(&ProtoGaia, &Map, Step_Count, tmp_RanMax);
+
+    //std::string tmp_EName = "";
+
+    //generate_NULL_Hypo_Gaia(&Map, Step_Count, random_Seed, 0, EName);
+
+    manual_Mode(&ProtoGaia, &Map, Step_Count, random_Seed, 25, EName, output_Bulk, Score_Threshold_Modifier);
+
+    /*
+    random_Seed = random_Seed_Base;
+    srand(random_Seed);
+    for (int cou_R = 0; cou_R < tmp_Pred_Run_Count; cou_R++)
+    {
+        EName = EName + "." + std::to_string(random_Seed);
+
+        pred_Hypo(&ProtoGaia, &Map, Step_Count, tmp_Stat_Count, random_Seed, EName);
+        random_Seed++;
+    }
+
+    random_Seed = random_Seed_Base;
+    for (int cou_R = 0; cou_R < tmp_Null_Run_Count; cou_R++)
+    {
+        EName = EName + "." + std::to_string(random_Seed);
+
+        null_Hypo(&ProtoGaia, &Map, Step_Count, tmp_Stat_Count, random_Seed, EName);
+        random_Seed++;
+    }*/
+
+    //train_Actuators(&ProtoGaia, &Map, Step_Count, tmp_Train_Depth);
+    //random_Training(&ProtoGaia, &Map, Step_Count, tmp_RanMax);
+
+
+
+
+
+    return 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int run_Gaia()
 {
+
+
     std::string EName = "";
     std::cout << "\n Enter Experiment_Name (string): ";
     /*-*/std::cin >> EName;
     //---EName = "testing";
 
     int Chrono_Depth = 3;
+    std::cout << "\n Chrono depth represents how far into the future the model can make predictions. It is recommended this value be large enough to capture causal relationships between actuators and sensors. This is based on samples and not the granularity of your data. To find this value determine the number of frames in your series needed to capture a change, then take that and calculate the samples needed to encompas the event, that is the number to use here.";
     std::cout << "\n Enter Chrono_Depth (int): ";
     std::cin >> Chrono_Depth;
 
     int Step_Count = 100;
+    std::cout << "\n\n The step cound is how often Gaia samples the sim data, how many frames of the simulation go by between Gaia checking in.";
     std::cout << "\n Enter Step_Count (int): ";
     std::cin >> Step_Count;
-     
+
     int tmp_Train_Depth = 10;
+    std::cout << "\n\n This is a deliberate exploratory method where the system flips a switch and watches for n ticks, iterating through them.";
     std::cout << "\n Enter tmp_Actuator_Train_Depth (int): ";
     std::cin >> tmp_Train_Depth;
 
     int tmp_RanMax = 250;
+    std::cout << "\n\n This does exploratory behavior by flipping actuators on randomly for the number of ticks specified. It makes no attempt to process the results, only remember them during this training phase.";
     std::cout << "\n Enter tmp_Random_Train_Depth (int): ";
     std::cin >> tmp_RanMax;
 
@@ -2345,70 +2812,107 @@ int run_Gaia()
 
     int random_Seed_Base = 0;
     int random_Seed = 0;
+    std::cout << "\n\n The random run seed is the seed used to generate the map, changing this changes the layout, sensor / actuator values, and the RNG for exploratory behavior during the test. Used to test robustness across different environment configurations.";
+
     std::cout << "\n Enter random_Run_Seed (int): ";
     std::cin >> random_Seed_Base;
     random_Seed = random_Seed_Base;
 
     int random_Training_Seed_Base = 9000;
+    std::cout << "\n\n The random training seed is the seed used for the RNG during the training process if using random training, changing this gives a different set of random training data, used to test robustness in regards to inference from datasets.";
     std::cout << "\n Enter random_Training_Seed (int): ";
     std::cin >> random_Training_Seed_Base;
 
     //The hyperparamters.
     float hyper_Param_Prediction_Action_Potential_Threshold_MSC = 9000;
-    std::cout << "\n Enter Prediction hyper_Param_Prediction_Action_Potential_Threshold_MSC (float): ";
+    std::cout << "\n\n The action potential threshold is a filter, it determines how strongly a node needs to be charged before it fires and passes on the charge, the higher the number the more strick the filter, with 1.0 only allowing the top ones through. Higher numbers equals more precise resutls, but too high and the system may be too rigid to function.";
+    std::cout << "\n Enter Prediction Action_Potential_Threshold_MSC (float): ";
     std::cin >> hyper_Param_Prediction_Action_Potential_Threshold_MSC;
 
     float hyper_Param_Prediction_Modifier_Charge_MSC = 9000;
-    std::cout << "\n Enter Prediction hyper_Param_Prediction_Modifier_Charge_MSC (float): ";
+    std::cout << "\n The modifier charge determines how much of the charge is passed to the next nodes, 1.0 means the full charge is passed, 0.0 is no charge. Used as a filter by reducing the 'spread' of nodes activated, making more of a spike favoring the stronger gradients in the cascade.";
+    std::cout << "\n Enter Prediction Modifier_Charge_MSC (float): ";
     std::cin >> hyper_Param_Prediction_Modifier_Charge_MSC;
 
     float hyper_Param_Prediction_Action_Potential_Threshold_Chrono = 9000;
-    std::cout << "\n Enter Prediction hyper_Param_Prediction_Action_Potential_Threshold_Chrono (float): ";
+    std::cout << "\n\n The action potential threshold is a filter, it determines how strongly a node needs to be charged before it fires and passes on the charge, the higher the number the more strick the filter, with 1.0 only allowing the top ones through. Higher numbers equals more precise resutls, but too high and the system may be too rigid to function.";
+    std::cout << "\n Enter Prediction Action_Potential_Threshold_Chrono (float): ";
     std::cin >> hyper_Param_Prediction_Action_Potential_Threshold_Chrono;
 
     float hyper_Param_Prediction_Modifier_Charge_Chrono = 9000;
-    std::cout << "\n Enter Prediction hyper_Param_Prediction_Modifier_Charge_Chrono (float): ";
+    std::cout << "\n The modifier charge determines how much of the charge is passed to the next nodes, 1.0 means the full charge is passed, 0.0 is no charge. Used as a filter by reducing the 'spread' of nodes activated, making more of a spike favoring the stronger gradients in the cascade.";
+    std::cout << "\n Enter Prediction Modifier_Charge_Chrono (float): ";
     std::cin >> hyper_Param_Prediction_Modifier_Charge_Chrono;
 
 
 
     float hyper_Param_Deviation_Action_Potential_Threshold_MSC = 9000;
+    std::cout << "\n\n The action potential threshold is a filter, it determines how strongly a node needs to be charged before it fires and passes on the charge, the higher the number the more strick the filter, with 1.0 only allowing the top ones through. Higher numbers equals more precise resutls, but too high and the system may be too rigid to function.";
     std::cout << "\n Enter Deviation hyper_Param_Deviation_Action_Potential_Threshold_MSC (float): ";
     std::cin >> hyper_Param_Deviation_Action_Potential_Threshold_MSC;
 
     float hyper_Param_Deviation_Modifier_Charge_MSC = 9000;
+    std::cout << "\n The modifier charge determines how much of the charge is passed to the next nodes, 1.0 means the full charge is passed, 0.0 is no charge. Used as a filter by reducing the 'spread' of nodes activated, making more of a spike favoring the stronger gradients in the cascade.";
     std::cout << "\n Enter Deviation hyper_Param_Deviation_Modifier_Charge_MSC (float): ";
     std::cin >> hyper_Param_Deviation_Modifier_Charge_MSC;
 
     float hyper_Param_Deviation_Action_Potential_Threshold_Chrono = 9000;
+    std::cout << "\n\n The action potential threshold is a filter, it determines how strongly a node needs to be charged before it fires and passes on the charge, the higher the number the more strick the filter, with 1.0 only allowing the top ones through. Higher numbers equals more precise resutls, but too high and the system may be too rigid to function.";
     std::cout << "\n Enter Deviation hyper_Param_Deviation_Action_Potential_Threshold_Chrono (float): ";
     std::cin >> hyper_Param_Deviation_Action_Potential_Threshold_Chrono;
 
     float hyper_Param_Deviation_Modifier_Charge_Chrono = 9000;
+    std::cout << "\n The modifier charge determines how much of the charge is passed to the next nodes, 1.0 means the full charge is passed, 0.0 is no charge. Used as a filter by reducing the 'spread' of nodes activated, making more of a spike favoring the stronger gradients in the cascade.";
     std::cout << "\n Enter Deviation hyper_Param_Deviation_Modifier_Charge_Chrono (float): ";
     std::cin >> hyper_Param_Deviation_Modifier_Charge_Chrono;
 
 
     bool output_Bulk = false;
+    std::cout << "\n\n The Bulk is the entirety of the memories retrieved during the deviation mapping search, the option to turn it on and off is because it creates large files and slows the program.";
     std::cout << "\n Enter output_Bulk [0 | 1]: ";
     std::cin >> output_Bulk;
+
+    int Sensor_Count = 6;
+    std::cout << "\n\n How many sensors do you want.";
+    std::cout << "\n Enter Sensor_Count (int): ";
+    std::cin >> Sensor_Count;
+
+    int Actuator_Count = 6;
+    std::cout << "\n\n How many actuators do you want.";
+    std::cout << "\n Enter Actuator_Count (int): ";
+    std::cin >> Actuator_Count;
+
+    float  Score_Threshold_Modifier = 0.5;
+    std::cout << "\n\n This is the threshold for the scores to activate the output signals, take the highest score, and the others as a percentage of that one. This value is the percentage match to be valid output signals. A value of 0.5 means that those who have a score higher than 50% of the highest are output as valid signals.";
+    std::cout << "\n Enter Score_Threshold_Modifier (float): ";
+    std::cin >> Score_Threshold_Modifier;
+
+    int Map_Width = 25;
+    std::cout << "\n\n This is the Width of the map.";
+    std::cout << "\n Enter Map_Width (int): ";
+    std::cin >> Map_Width;
+
+    int Map_Height = 25;
+    std::cout << "\n\n This is the Height of the map.";
+    std::cout << "\n Enter Map_Height (int): ";
+    std::cin >> Map_Height;
 
 
     std::string tmp_EName_Full = "./GaiaTesting/" + EName + ".cfg";
 
     std::ofstream NSF;
-    NSF.open(tmp_EName_Full, std::ios::ate);
+    NSF.open(tmp_EName_Full, std::ios::trunc);
 
     NSF << "Chrono_Depth (int): ";
     NSF << Chrono_Depth;
 
-    NSF << "\n Step_Count (int): ";
+    NSF << "\nStep_Count (int): ";
     NSF << Step_Count;
 
-    NSF << "\n tmp_Actuator_Train_Depth (int): ";
+    NSF << "\nActuator_Train_Depth (int): ";
     NSF << tmp_Train_Depth;
 
-    NSF << "\n tmp_Random_Train_Depth (int): ";
+    NSF << "\nRandom_Train_Depth (int): ";
     NSF << tmp_RanMax;
 
     /*
@@ -2425,21 +2929,66 @@ int run_Gaia()
     NSF << tmp_Test_Count;
     */
 
-    NSF << "\n random_Run_Seed (int): ";
-    NSF << random_Seed_Base;
-    
-    NSF << "\n Enter random_Training_Seed (int): ";
-    NSF << random_Training_Seed_Base;
-    NSF.close();
 
+    NSF << "\nrandom_Run_Seed (int): ";
+    NSF << random_Seed_Base;
+
+    NSF << "\nrandom_Training_Seed (int): ";
+    NSF << random_Training_Seed_Base;
+
+    NSF << "\nhyper_Param_Prediction_Action_Potential_Threshold_MSC (float): ";
+    NSF << hyper_Param_Prediction_Action_Potential_Threshold_MSC;
+
+    NSF << "\nhyper_Param_Prediction_Modifier_Charge_MSC (float): ";
+    NSF << hyper_Param_Prediction_Modifier_Charge_MSC;
+
+    NSF << "\nhyper_Param_Prediction_Action_Potential_Threshold_Chrono (float): ";
+    NSF << hyper_Param_Prediction_Action_Potential_Threshold_Chrono;
+
+    NSF << "\nhyper_Param_Prediction_Modifier_Charge_Chrono (float): ";
+    NSF << hyper_Param_Prediction_Modifier_Charge_Chrono;
+
+    NSF << "\nhyper_Param_Deviation_Action_Potential_Threshold_MSC (float): ";
+    NSF << hyper_Param_Deviation_Action_Potential_Threshold_MSC;
+
+    NSF << "\nhyper_Param_Deviation_Modifier_Charge_MSC (float): ";
+    NSF << hyper_Param_Deviation_Modifier_Charge_MSC;
+
+    NSF << "\nhyper_Param_Deviation_Action_Potential_Threshold_Chrono (float): ";
+    NSF << hyper_Param_Deviation_Action_Potential_Threshold_Chrono;
+
+    NSF << "\nhyper_Param_Deviation_Modifier_Charge_Chrono (float): ";
+    NSF << hyper_Param_Deviation_Modifier_Charge_Chrono;
+
+    NSF << "\noutput_Bulk (bool): ";
+    NSF << output_Bulk;
+
+    NSF << "\nsensor_Count (int): ";
+    NSF << Sensor_Count;
+
+    NSF << "\nactuator_Count (int): ";
+    NSF << Actuator_Count;
+
+    NSF << "\nScore_Threshold_Modifier (float): ";
+    NSF << Score_Threshold_Modifier;
+
+    NSF << "\nMap_Width (int): ";
+    NSF << Map_Width;
+
+    NSF << "\nMap_Height (int): ";
+    NSF << Map_Height;
+
+    NSF.close();
     srand(random_Seed);
 
     //c_Map_Sim Map(25, 25);
-    c_Map_Sim Map(25, 25);
+    c_Map_Sim Map(Map_Width, Map_Height);
     c_Homeostasis_Module ProtoGaia;
 
-    setup_Map(&Map);
-    setup_Gaia(&ProtoGaia, Chrono_Depth, 6);
+    setup_Map(&Map, Sensor_Count, Actuator_Count);
+    setup_Gaia(&ProtoGaia, Chrono_Depth, Sensor_Count, Actuator_Count);
+    //Map.init_Agents(250);
+    //Map.output_Agents();
 
     ProtoGaia.TSG.set_Chrono_APT(0, hyper_Param_Prediction_Action_Potential_Threshold_Chrono);
     ProtoGaia.TSG.set_MSC_APT(0, hyper_Param_Prediction_Action_Potential_Threshold_MSC);
@@ -2451,22 +3000,17 @@ int run_Gaia()
     ProtoGaia.TSG.set_Chrono_MC(1, hyper_Param_Deviation_Modifier_Charge_Chrono);
     ProtoGaia.TSG.set_MSC_MC(1, hyper_Param_Deviation_Modifier_Charge_MSC);
 
-
     srand(random_Training_Seed_Base);
     train_Actuators(&ProtoGaia, &Map, Step_Count, tmp_Train_Depth);
     srand(random_Training_Seed_Base);
     random_Training(&ProtoGaia, &Map, Step_Count, tmp_RanMax);
 
     //std::string tmp_EName = "";
-    
-    generate_NULL_Hypo_Gaia(&Map, Step_Count, random_Seed, 0, EName);
 
-    while (1)
-    {
-        manual_Mode(&ProtoGaia, &Map, Step_Count, random_Seed, 1000, EName, output_Bulk);
-        return 1;
-    }
-    
+    //generate_NULL_Hypo_Gaia(&Map, Step_Count, random_Seed, 0, EName);
+
+    manual_Mode(&ProtoGaia, &Map, Step_Count, random_Seed, 25, EName, output_Bulk, Score_Threshold_Modifier);
+
     /*
     random_Seed = random_Seed_Base;
     srand(random_Seed);
